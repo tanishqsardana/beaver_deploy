@@ -115,3 +115,4 @@ wcwidth==0.2.13
 widgetsnbextension==4.0.13
 xyzservices==2025.1.0
 zipp==3.21.0
+pkg_resources
