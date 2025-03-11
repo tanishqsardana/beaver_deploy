@@ -297,8 +297,16 @@ if 'Waterway' in st.session_state:
             # Step 3: Map over the indices to get each feature and set a new property.
             
 
-            
-            Neg_points_id = ee.FeatureCollection(indices.map(set_id_negatives))
+            def set_id_negatives2(idx):
+                idx = ee.Number(idx)
+                feature = ee.Feature(features_list.get(idx))
+                # Cast idx.add(1) to an integer and then format as a string without decimals.
+                labeled_feature = feature.set(
+                    'id_property', ee.String('N').cat(idx.add(1).int().format())
+                )
+                return labeled_feature
+            Neg_points_id = ee.FeatureCollection(indices.map(set_id_negatives2))
+            # Neg_points_id = ee.FeatureCollection(indices.map(set_id_negatives))
             Positive_Dams = st.session_state.Positive_collection
             Positive_dam_id = Positive_Dams.map(lambda feature: feature.set('Dam', 'positive').set('id_property', feature.get('DamID')))
             Merged_collection = Positive_dam_id.merge(Neg_points_id)
