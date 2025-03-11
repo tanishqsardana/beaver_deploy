@@ -29,7 +29,7 @@ import json
 from google.oauth2 import service_account
 
 
-SERVICE_ACCOUNT_FILE = "project-beaver-415818-a4eb6a21a9a8.json"
+SERVICE_ACCOUNT_FILE = "ee-beaver-lab-37f45e7fed2e.json"
 EE_SCOPES = ['https://www.googleapis.com/auth/earthengine']
 
 if not os.path.exists(SERVICE_ACCOUNT_FILE):
