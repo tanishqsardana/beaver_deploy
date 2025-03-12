@@ -54,8 +54,10 @@ ee.Initialize(credentials, project="ee-beaver-lab")
 # Initialize session state variables
 if "Positive_collection" not in st.session_state:
     st.session_state.Positive_collection = None
-if "buffer_radius" not in st.session_state:
-    st.session_state.buffer_radius = 200
+# if "buffer_radius" not in st.session_state:
+#     st.session_state.buffer_radius = 200
+# if "year_selection" not in st.session_state:
+#     st.session_state.year_selection = 2020
 
 
 # Streamlit UI
@@ -320,6 +322,10 @@ if 'Waterway' in st.session_state:
             Negative_points.to_streamlit(width=1200, height=700)
             
 
+if "buffer_radius" not in st.session_state:
+    st.session_state.buffer_radius = 200
+if "year_selection" not in st.session_state:
+    st.session_state.year_selection = 2020
 
 if 'Merged_collection' in st.session_state:
     st.subheader("3. Buffer dam locations:")
