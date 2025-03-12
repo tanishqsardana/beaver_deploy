@@ -328,6 +328,9 @@ if 'Merged_collection' in st.session_state:
     buffer_radius = st.number_input(
         "Enter buffer radius in meters:", min_value=1, step=1, value=st.session_state.buffer_radius
     )
+    year_selection = st.number_input(
+        "Enter year (between 2017-2024):", min_value=1, step=1, value=st.session_state.year_selection
+    )
 
     # Button to apply Dam status and create buffers
     if st.button("Apply Dam Status and Create Buffers"):
@@ -337,8 +340,10 @@ if 'Merged_collection' in st.session_state:
         def add_dam_buffer_and_standardize_date(feature):
             # Add Dam property and other metadata
             dam_status = feature.get("Dam")
-            date = feature.get("date")
-            formatted_date = ee.Date(date).format('YYYYMMdd')
+            
+            # Force the date to July 1st of the specified year
+            standardized_date = ee.Date.fromYMD(year_selection, 7, 1)
+            formatted_date = standardized_date.format('YYYYMMdd')
             
             # Buffer geometry while retaining properties
             buffered_geometry = feature.geometry().buffer(buffer_radius)
@@ -346,11 +351,12 @@ if 'Merged_collection' in st.session_state:
             # Create a new feature with buffered geometry and updated properties
             return ee.Feature(buffered_geometry).set({
                 "Dam": dam_status,
-                "Survey_Date": ee.Date(date),
-                "Damdate": ee.String("DamDate_").cat(formatted_date),
+                "Survey_Date": standardized_date,  # Set survey date to July 1st
+                "Damdate": ee.String("DamDate_").cat(formatted_date),  # Updated date format
                 "Point_geo": feature.geometry(),
                 "id_property": feature.get("id_property")
             })
+
 
         Buffered_collection = st.session_state['Merged_collection'].map(add_dam_buffer_and_standardize_date)
         
