@@ -326,7 +326,7 @@ if 'Merged_collection' in st.session_state:
 
     # User inputs for Dam status and buffer radius
     buffer_radius = st.number_input(
-        "Enter buffer radius in meters:", min_value=1, step=1, value=st.session_state.buffer_radius
+        "Enter buffer radius (meters):", min_value=1, step=1, value=st.session_state.buffer_radius
     )
     year_selection = st.number_input(
         "Enter year (between 2017-2024):", min_value=1, step=1, value=st.session_state.year_selection
