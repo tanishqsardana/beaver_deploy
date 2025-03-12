@@ -333,7 +333,27 @@ if 'Merged_collection' in st.session_state:
     if st.button("Apply Dam Status and Create Buffers"):
         # Apply the function to the feature collection
         Merged_col = st.session_state['Merged_collection']
+
+        def add_dam_buffer_and_standardize_date(feature):
+            # Add Dam property and other metadata
+            dam_status = feature.get("Dam")
+            date = feature.get("date")
+            formatted_date = ee.Date(date).format('YYYYMMdd')
+            
+            # Buffer geometry while retaining properties
+            buffered_geometry = feature.geometry().buffer(buffer_radius)
+            
+            # Create a new feature with buffered geometry and updated properties
+            return ee.Feature(buffered_geometry).set({
+                "Dam": dam_status,
+                "Survey_Date": ee.Date(date),
+                "Damdate": ee.String("DamDate_").cat(formatted_date),
+                "Point_geo": feature.geometry(),
+                "id_property": feature.get("id_property")
+            })
+
         Buffered_collection = st.session_state['Merged_collection'].map(add_dam_buffer_and_standardize_date)
+        
 
         # Select only relevant properties
         Dam_data = Buffered_collection.select(['id_property', 'Dam', 'Survey_Date', 'Damdate', 'Point_geo'])
