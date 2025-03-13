@@ -10,3 +10,5 @@ New information!
 '''
 
 st.balloons()
+
+st.write("This is a test")
