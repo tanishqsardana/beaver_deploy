@@ -2,7 +2,7 @@ import streamlit as st
 st.set_page_config(layout="wide")
 
 # Place the logo at the top
-st.sidebar.image("assets/pngimg.com - beaver_PNG35.png", use_containcer_width=True)
+st.sidebar.image("assets/pngimg.com - beaver_PNG35.png", use_container_width=True)
 
 about_page = st.Page(
     page = "pages/About_Lab.py",
