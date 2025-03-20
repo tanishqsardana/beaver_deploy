@@ -89,47 +89,34 @@ def parse_date(value, date_format):
         return None  # Return None if the date cannot be parsed
 
 def upload_points_to_ee(file):
-    """Handles CSV and GeoJSON file uploads, standardizes data, and converts them into an Earth Engine FeatureCollection."""
+    """
+    Handles CSV and GeoJSON uploads, standardizes data, and converts them into an
+    Earth Engine FeatureCollection. Waits for user input before processing.
+    """
+    if not file:
+        return None  # If no file is uploaded, return None
+
     try:
         if file.name.endswith(".csv"):
-            # Reset file pointer before re-reading
+            # Reset file pointer before reading
             file.seek(0)
 
-            # Allow the user to specify delimiter
+            # Let user select delimiter
             delimiter = st.selectbox("Select delimiter used in CSV:", [",", ";", "\t"], index=0)
 
-            try:
-                # Read CSV file with user-defined delimiter
-                df = pd.read_csv(file, delimiter=delimiter, dtype=str, encoding="utf-8")
+            # Read preview for display
+            df_preview = pd.read_csv(file, delimiter=delimiter, dtype=str, encoding="utf-8", nrows=5)
+            st.write("📋 **Preview of the uploaded file:**")
+            st.dataframe(df_preview)
 
-                if df.empty:
-                    st.error("❌ No data found in the file. Please check the format.")
-                    return None
-
-            except pd.errors.EmptyDataError:
-                st.error("❌ The file is empty or improperly formatted.")
-                return None
-            except pd.errors.ParserError:
-                st.error("❌ Error parsing the file. Please check the delimiter and format.")
-                return None
-            except UnicodeDecodeError:
-                st.error("❌ Encoding issue detected. Try saving the file with UTF-8 encoding.")
-                return None
-
-            # Display preview of the uploaded file
-            st.write("📋 **Uploaded CSV preview:**")
-            st.dataframe(df.head())
-
-            # Reset file pointer again before re-reading
+            # Reset file pointer before reading again
             file.seek(0)
 
-            # Allow user to confirm header presence
+            # Let user choose header presence
             header_option = st.radio("Does the file contain headers?", ["Yes", "No"], index=0)
-
-            # Reload the file based on user selection
             df = pd.read_csv(file, delimiter=delimiter, header=0 if header_option == "Yes" else None, encoding="utf-8")
 
-            # Ensure that column selection is interactive
+            # Let user select columns
             longitude_col = st.selectbox("Select the **Longitude** column:", df.columns)
             latitude_col = st.selectbox("Select the **Latitude** column:", df.columns)
             date_col = st.selectbox("Select the **Date** column (optional):", ["None"] + list(df.columns))
@@ -141,59 +128,52 @@ def upload_points_to_ee(file):
                 ["Auto Detect", "YYYY-MM-DD", "MM/DD/YYYY", "DD-MM-YYYY", "Unix Timestamp"]
             )
 
-            # Validate column selections
-            if not longitude_col or not latitude_col:
-                st.error("❌ Longitude and Latitude columns must be selected.")
-                return None
+            # Button to confirm processing
+            if st.button("Confirm and Process Data"):
+                # Convert DataFrame rows into Earth Engine Features
+                def standardize_feature(row):
+                    longitude = clean_coordinate(row[longitude_col])
+                    latitude = clean_coordinate(row[latitude_col])
 
-            # Convert DataFrame rows into Earth Engine Features
-            def standardize_feature(row):
-                longitude = clean_coordinate(row[longitude_col])
-                latitude = clean_coordinate(row[latitude_col])
+                    if longitude is None or latitude is None:
+                        return None  # Skip rows with invalid coordinates
 
-                if longitude is None or latitude is None:
-                    return None  # Skip rows with invalid coordinates
+                    # Handle date column
+                    dam_date = None
+                    if date_col != "None":
+                        dam_date = parse_date(row[date_col], date_format)
 
-                # Handle date column
-                dam_date = None
-                if date_col != "None":
-                    dam_date = parse_date(row[date_col], date_format)
+                    # Handle DamID column
+                    dam_id = row[damid_col] if damid_col != "None" else "unknown"
 
-                # Handle DamID column
-                dam_id = row[damid_col] if damid_col != "None" else "unknown"
+                    # Create properties dictionary
+                    properties = {"DamID": dam_id}
+                    if dam_date:
+                        properties["date"] = dam_date
 
-                # Create properties dictionary
-                properties = {"DamID": dam_id}
-                if dam_date:
-                    properties["date"] = dam_date
+                    # Convert to Earth Engine feature
+                    return ee.Feature(ee.Geometry.Point([longitude, latitude]), properties)
 
-                # Convert to Earth Engine feature
-                return ee.Feature(ee.Geometry.Point([longitude, latitude]), properties)
+                # Apply standardization and filter out invalid rows
+                standardized_features = list(filter(None, df.apply(standardize_feature, axis=1).tolist()))
+                feature_collection = ee.FeatureCollection(standardized_features)
 
-            # Apply standardization and filter out invalid rows
-            standardized_features = list(filter(None, df.apply(standardize_feature, axis=1).tolist()))
-            feature_collection = ee.FeatureCollection(standardized_features)
-
-            st.success("✅ CSV successfully uploaded and standardized.")
-            return feature_collection
+                st.success("✅ CSV successfully uploaded and standardized.")
+                return feature_collection  # Return processed data
 
         elif file.name.endswith(".geojson"):
-            # Reset file pointer before reading GeoJSON
-            file.seek(0)
-
-            # Read GeoJSON file
+            file.seek(0)  # Reset pointer
             try:
                 geojson = json.load(file)
             except json.JSONDecodeError:
                 st.error("❌ Invalid GeoJSON file format.")
                 return None
 
-            # Validate GeoJSON structure
             if "features" not in geojson or not isinstance(geojson["features"], list):
                 st.error("❌ Invalid GeoJSON format: missing 'features' key.")
                 return None
 
-            # Convert GeoJSON features to Earth Engine Features
+            # Convert to Earth Engine FeatureCollection
             features = []
             for i, feature_obj in enumerate(geojson["features"]):
                 try:
@@ -204,9 +184,8 @@ def upload_points_to_ee(file):
                     st.warning(f"⚠️ Skipped feature {i} due to an error: {e}")
 
             feature_collection = ee.FeatureCollection(features)
-
             st.success("✅ GeoJSON successfully uploaded and converted.")
-            return feature_collection
+            return feature_collection  # Return processed data
 
         else:
             st.error("❌ Unsupported file format. Please upload a CSV or GeoJSON file.")
@@ -215,3 +194,76 @@ def upload_points_to_ee(file):
     except Exception as e:
         st.error(f"⚠️ An error occurred while processing the file: {e}")
         return None
+    
+
+# Older Version of the function
+# def upload_points_to_ee(file):
+#     try:
+#         if file.name.endswith(".csv"):
+#             # Read CSV file
+#             df = pd.read_csv(file)
+
+#             # Debug: Check the DataFrame structure
+#             st.write("Uploaded CSV preview:")
+#             st.dataframe(df.head())  # Display the first few rows for debugging
+
+#             # Ensure required columns exist
+#             required_columns = {"longitude", "latitude", "date", "DamID"}
+#             if not required_columns.issubset(df.columns):
+#                 st.error(f"CSV must have the following columns: {', '.join(required_columns)}.")
+#                 return None
+
+
+#             if not pd.to_datetime(df["date"], errors="coerce").notnull().all():
+#                 st.error("The 'date' column must be in a valid date format (e.g., YYYY-MM-DD).")
+#                 return None
+
+#             # Convert to a list of Earth Engine points with standardization
+#             def standardize_feature(row):
+#                 # Explicitly extract required values from the row
+#                 longitude = float(row["longitude"])
+#                 latitude = float(row["latitude"])
+#                 dam_date = str(row["date"])
+#                 dam_id = str(row["DamID"])
+
+#                 # Include only required properties in the feature
+#                 properties = {
+#                     "date": dam_date,
+#                     "DamID": dam_id,
+#                 }
+
+#                 # Create an Earth Engine feature
+#                 feature = ee.Feature(ee.Geometry.Point([longitude, latitude]), properties)
+#                 return set_id_year_property(feature)
+
+#             # Apply standardization to each row
+#             standardized_features = df.apply(standardize_feature, axis=1).tolist()
+#             feature_collection = ee.FeatureCollection(standardized_features)
+
+#             st.success("CSV successfully uploaded and standardized.")
+#             return feature_collection
+
+#         elif file.name.endswith(".geojson"):
+#             # Read GeoJSON file
+#             geojson = json.load(file)
+
+#             # Convert GeoJSON features to Earth Engine Features
+#             features = [
+#                 ee.Feature(
+#                     ee.Geometry(geom["geometry"]),
+#                     geom.get("properties", {"id": i}),
+#                 )
+#                 for i, geom in enumerate(geojson["features"])
+#             ]
+#             feature_collection = ee.FeatureCollection(features)
+
+#             st.success("GeoJSON successfully uploaded and converted.")
+#             return feature_collection
+
+#         else:
+#             st.error("Unsupported file format. Please upload a CSV or GeoJSON file.")
+#             return None
+
+#     except Exception as e:
+#         st.error(f"An error occurred while processing the file: {e}")
+#         return None
