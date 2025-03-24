@@ -8,5 +8,5 @@ This web application is generated using google earth engine and its python api g
 New information!
 
 '''
-
+st.write("This is a test")
 st.balloons()
