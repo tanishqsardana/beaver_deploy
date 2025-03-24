@@ -159,69 +159,84 @@ if "dataset_loaded" not in st.session_state:
 
 if 'Full_positive' in st.session_state:
     st.header("Select Waterway")
-    positive_dam_bounds = st.session_state['Full_positive'].geometry().bounds()
-    states_dataset = ee.FeatureCollection("TIGER/2018/States")  # US States boundaries dataset
-    states_with_dams = states_dataset.filterBounds(positive_dam_bounds)
-    st.session_state['Positive_dam_state'] = states_with_dams
-    states_geo = st.session_state['Positive_dam_state']
-    state_names = states_geo.aggregate_array("NAME").getInfo()
+    upload_own_checkbox = st.checkbox("Upload Own Dataset")
+    choose_existing_checkbox = st.checkbox("Choose an Existing Dataset")
 
-    if not state_names:
-        st.error("No states found within the Dam data bounds.")
-    else:
-        st.write(f"States within Dam data bounds: {state_names}")
-
-    # Dropdown for dataset options
-    dataset_option = st.selectbox(
-        "Choose a dataset for waterways:",
-        ["Choose", "WWF Free Flowing Rivers", "NHD by State"]
-    )
-
-    # Button to confirm dataset selection
-    if st.button("Load Existing Dataset"):
-        try:
-            if dataset_option == "WWF Free Flowing Rivers":
-                wwf_dataset = ee.FeatureCollection("WWF/HydroSHEDS/v1/FreeFlowingRivers")
-                clipped_wwf = wwf_dataset.filterBounds(states_with_dams)
-                st.session_state.selected_waterway = clipped_wwf
+    if upload_own_checkbox:
+        asset_id = st.text_input("Enter the GEE Asset Table ID for your dataset (e.g., projects/ee-beaver-lab/assets/Hydro/MA_Hydro_arc):")
+        if st.button("Load Uploaded Dataset"):
+            try:
+                waterway_own = ee.FeatureCollection(asset_id)
+                st.session_state.selected_waterway = waterway_own
                 st.session_state.dataset_loaded = True
-                st.success("WWF dataset loaded and added to the map.")
+                st.success("Uploaded dataset loaded and added to the map.")
+            except Exception as e:
+                st.error(f"Failed to load the dataset. Error: {e}")
 
-            elif dataset_option == "NHD by State":
-                state_initials = {
-                    "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR", "California": "CA",
-                    "Colorado": "CO", "Connecticut": "CT", "Delaware": "DE", "Florida": "FL", "Georgia": "GA",
-                    "Hawaii": "HI", "Idaho": "ID", "Illinois": "IL", "Indiana": "IN", "Iowa": "IA",
-                    "Kansas": "KS", "Kentucky": "KY", "Louisiana": "LA", "Maine": "ME", "Maryland": "MD",
-                    "Massachusetts": "MA", "Michigan": "MI", "Minnesota": "MN", "Mississippi": "MS",
-                    "Missouri": "MO", "Montana": "MT", "Nebraska": "NE", "Nevada": "NV", "New Hampshire": "NH",
-                    "New Jersey": "NJ", "New Mexico": "NM", "New York": "NY", "North Carolina": "NC",
-                    "North Dakota": "ND", "Ohio": "OH", "Oklahoma": "OK", "Oregon": "OR", "Pennsylvania": "PA",
-                    "Rhode Island": "RI", "South Carolina": "SC", "South Dakota": "SD", "Tennessee": "TN",
-                    "Texas": "TX", "Utah": "UT", "Vermont": "VT", "Virginia": "VA", "Washington": "WA",
-                    "West Virginia": "WV", "Wisconsin": "WI", "Wyoming": "WY"
-                }
+    if choose_existing_checkbox:
+        positive_dam_bounds = st.session_state['Full_positive'].geometry().bounds()
+        states_dataset = ee.FeatureCollection("TIGER/2018/States")  # US States boundaries dataset
+        states_with_dams = states_dataset.filterBounds(positive_dam_bounds)
+        st.session_state['Positive_dam_state'] = states_with_dams
+        states_geo = st.session_state['Positive_dam_state']
+        state_names = states_geo.aggregate_array("NAME").getInfo()
 
-                nhd_collections = []
-                for state in state_names:
-                    state_initial = state_initials.get(state)
-                    if state_initial:
-                        nhd_dataset = ee.FeatureCollection(
-                            f'projects/sat-io/open-datasets/NHD/NHD_{state_initial}/NHDFlowline'
-                        )
-                        nhd_collections.append(nhd_dataset)
+        if not state_names:
+            st.error("No states found within the Dam data bounds.")
+        else:
+            st.write(f"States within Dam data bounds: {state_names}")
 
-                # Merge all NHD datasets
-                if nhd_collections:
-                    merged_nhd = ee.FeatureCollection(nhd_collections).flatten()
-                    st.session_state.selected_waterway = merged_nhd
-                    st.session_state['Waterway'] = st.session_state.selected_waterway
+        # Dropdown for dataset options
+        dataset_option = st.selectbox(
+            "Choose a dataset for waterways:",
+            ["Choose", "WWF Free Flowing Rivers", "NHD by State"]
+        )
+
+        # Button to confirm dataset selection
+        if st.button("Load Existing Dataset"):
+            try:
+                if dataset_option == "WWF Free Flowing Rivers":
+                    wwf_dataset = ee.FeatureCollection("WWF/HydroSHEDS/v1/FreeFlowingRivers")
+                    clipped_wwf = wwf_dataset.filterBounds(states_with_dams)
+                    st.session_state.selected_waterway = clipped_wwf
                     st.session_state.dataset_loaded = True
-                    st.success("NHD datasets for selected states loaded and added to the map.")
-                else:
-                    st.error("No NHD datasets found for the selected states.")
-        except Exception as e:
-            st.error(f"Failed to load the dataset. Error: {e}")
+                    st.success("WWF dataset loaded and added to the map.")
+
+                elif dataset_option == "NHD by State":
+                    state_initials = {
+                        "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR", "California": "CA",
+                        "Colorado": "CO", "Connecticut": "CT", "Delaware": "DE", "Florida": "FL", "Georgia": "GA",
+                        "Hawaii": "HI", "Idaho": "ID", "Illinois": "IL", "Indiana": "IN", "Iowa": "IA",
+                        "Kansas": "KS", "Kentucky": "KY", "Louisiana": "LA", "Maine": "ME", "Maryland": "MD",
+                        "Massachusetts": "MA", "Michigan": "MI", "Minnesota": "MN", "Mississippi": "MS",
+                        "Missouri": "MO", "Montana": "MT", "Nebraska": "NE", "Nevada": "NV", "New Hampshire": "NH",
+                        "New Jersey": "NJ", "New Mexico": "NM", "New York": "NY", "North Carolina": "NC",
+                        "North Dakota": "ND", "Ohio": "OH", "Oklahoma": "OK", "Oregon": "OR", "Pennsylvania": "PA",
+                        "Rhode Island": "RI", "South Carolina": "SC", "South Dakota": "SD", "Tennessee": "TN",
+                        "Texas": "TX", "Utah": "UT", "Vermont": "VT", "Virginia": "VA", "Washington": "WA",
+                        "West Virginia": "WV", "Wisconsin": "WI", "Wyoming": "WY"
+                    }
+
+                    nhd_collections = []
+                    for state in state_names:
+                        state_initial = state_initials.get(state)
+                        if state_initial:
+                            nhd_dataset = ee.FeatureCollection(
+                                f'projects/sat-io/open-datasets/NHD/NHD_{state_initial}/NHDFlowline'
+                            )
+                            nhd_collections.append(nhd_dataset)
+
+                    # Merge all NHD datasets
+                    if nhd_collections:
+                        merged_nhd = ee.FeatureCollection(nhd_collections).flatten()
+                        st.session_state.selected_waterway = merged_nhd
+                        st.session_state['Waterway'] = st.session_state.selected_waterway
+                        st.session_state.dataset_loaded = True
+                        st.success("NHD datasets for selected states loaded and added to the map.")
+                    else:
+                        st.error("No NHD datasets found for the selected states.")
+            except Exception as e:
+                st.error(f"Failed to load the dataset. Error: {e}")
 
     # Display the map
     if 'Waterway' in st.session_state:
