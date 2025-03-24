@@ -91,66 +91,62 @@ def parse_date(value, date_format):
 def upload_points_to_ee(file):
     """
     Handles CSV and GeoJSON uploads, standardizes data, and converts them into an
-    Earth Engine FeatureCollection. Waits for user input before processing.
+    Earth Engine FeatureCollection. Allows the user to assign a fixed date based on selected year.
     """
     if not file:
-        return None  # If no file is uploaded, return None
+        return None
 
     try:
         if file.name.endswith(".csv"):
-            # Reset file pointer before reading
             file.seek(0)
 
-            # Let user select delimiter with clearer labels
             delimiter_display = {",": "Comma (,)", ";": "Semicolon (;)", "\t": "Tab (\\t)"}
             delimiter_key = st.selectbox("Select delimiter used in CSV:", list(delimiter_display.values()), index=0)
             delimiter = [k for k, v in delimiter_display.items() if v == delimiter_key][0]
 
-            # Read preview for display
             df_preview = pd.read_csv(file, delimiter=delimiter, dtype=str, encoding="utf-8", nrows=5, header=None)
             st.write("**Preview of the uploaded file:**")
             st.dataframe(df_preview)
 
-            # Reset file pointer before reading again
             file.seek(0)
 
-            # Let user choose header presence
             header_option = st.radio("Does the file contain headers?", ["Yes", "No"], index=0)
             if header_option == "Yes":
                 df = pd.read_csv(file, delimiter=delimiter, header=0, encoding="utf-8")
             else:
                 df = pd.read_csv(file, delimiter=delimiter, header=None, encoding="utf-8")
-                df.columns = [f"column{i}" for i in range(len(df.columns))]  # Assign column0, column1...
+                df.columns = [f"column{i}" for i in range(len(df.columns))]
 
-            # Let user select columns
             longitude_col = st.selectbox("Select the **Longitude** column:", df.columns)
             latitude_col = st.selectbox("Select the **Latitude** column:", df.columns)
 
-            # Button to confirm processing
+            # Year selection & default prompt
+            selected_year = st.selectbox("Select a year (default date will be July 1 of selected year):", list(range(2017, 2025)), index=3)
+            selected_date = f"{selected_year}-07-01"
+
+            # ET availability warning
+            if selected_year < 2020 or selected_year > 2025:
+                st.warning("You may proceed to next steps, but ET data may not be available for the selected year.")
+
             if st.button("Confirm and Process Data"):
-                # Convert DataFrame rows into Earth Engine Features
                 def standardize_feature(row):
                     longitude = clean_coordinate(row[longitude_col])
                     latitude = clean_coordinate(row[latitude_col])
 
                     if longitude is None or latitude is None:
-                        return None  # Skip rows with invalid coordinates
+                        return None
 
-                    # Create properties dictionary (empty or add more if needed)
-                    properties = {}
-
-                    # Convert to Earth Engine feature
+                    properties = {"date": selected_date}
                     return ee.Feature(ee.Geometry.Point([longitude, latitude]), properties)
 
-                # Apply standardization and filter out invalid rows
                 standardized_features = list(filter(None, df.apply(standardize_feature, axis=1).tolist()))
                 feature_collection = ee.FeatureCollection(standardized_features)
 
                 st.success("CSV successfully uploaded and standardized.")
-                return feature_collection  # Return processed data
+                return feature_collection
 
         elif file.name.endswith(".geojson"):
-            file.seek(0)  # Reset pointer
+            file.seek(0)
             try:
                 geojson = json.load(file)
             except json.JSONDecodeError:
@@ -161,19 +157,27 @@ def upload_points_to_ee(file):
                 st.error("Invalid GeoJSON format: missing 'features' key.")
                 return None
 
-            # Convert to Earth Engine FeatureCollection
-            features = []
-            for i, feature_obj in enumerate(geojson["features"]):
-                try:
-                    geom = feature_obj.get("geometry")
-                    props = feature_obj.get("properties", {"id": i})
-                    features.append(ee.Feature(ee.Geometry(geom), props))
-                except Exception as e:
-                    st.warning(f"Skipped feature {i} due to an error: {e}")
+            # year selection & default prompt
+            selected_year = st.selectbox("Select a year (default date will be July 1 of selected year):", list(range(2017, 2025)), index=3)
+            selected_date = f"{selected_year}-07-01"
 
-            feature_collection = ee.FeatureCollection(features)
-            st.success("GeoJSON successfully uploaded and converted.")
-            return feature_collection  # Return processed data
+            if selected_year < 2020 or selected_year > 2025:
+                st.warning("You may proceed to next steps, but ET data may not be available for the selected year.")
+
+            if st.button("Confirm and Process GeoJSON"):
+                features = []
+                for i, feature_obj in enumerate(geojson["features"]):
+                    try:
+                        geom = feature_obj.get("geometry")
+                        props = feature_obj.get("properties", {"id": i})
+                        props["date"] = selected_date  # Add the selected date to the properties
+                        features.append(ee.Feature(ee.Geometry(geom), props))
+                    except Exception as e:
+                        st.warning(f"Skipped feature {i} due to an error: {e}")
+
+                feature_collection = ee.FeatureCollection(features)
+                st.success("GeoJSON successfully uploaded and converted.")
+                return feature_collection
 
         else:
             st.error("Unsupported file format. Please upload a CSV or GeoJSON file.")
@@ -182,6 +186,7 @@ def upload_points_to_ee(file):
     except Exception as e:
         st.error(f"An error occurred while processing the file: {e}")
         return None
+
 
 # Older Version of the function
 # def upload_points_to_ee(file):
