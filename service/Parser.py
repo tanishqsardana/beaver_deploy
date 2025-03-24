@@ -106,7 +106,7 @@ def upload_points_to_ee(file):
 
             # Read preview for display
             df_preview = pd.read_csv(file, delimiter=delimiter, dtype=str, encoding="utf-8", nrows=5)
-            st.write("📋 **Preview of the uploaded file:**")
+            st.write("**Preview of the uploaded file:**")
             st.dataframe(df_preview)
 
             # Reset file pointer before reading again
@@ -158,7 +158,7 @@ def upload_points_to_ee(file):
                 standardized_features = list(filter(None, df.apply(standardize_feature, axis=1).tolist()))
                 feature_collection = ee.FeatureCollection(standardized_features)
 
-                st.success("✅ CSV successfully uploaded and standardized.")
+                st.success("CSV successfully uploaded and standardized.")
                 return feature_collection  # Return processed data
 
         elif file.name.endswith(".geojson"):
@@ -166,11 +166,11 @@ def upload_points_to_ee(file):
             try:
                 geojson = json.load(file)
             except json.JSONDecodeError:
-                st.error("❌ Invalid GeoJSON file format.")
+                st.error("Invalid GeoJSON file format.")
                 return None
 
             if "features" not in geojson or not isinstance(geojson["features"], list):
-                st.error("❌ Invalid GeoJSON format: missing 'features' key.")
+                st.error("Invalid GeoJSON format: missing 'features' key.")
                 return None
 
             # Convert to Earth Engine FeatureCollection
@@ -181,18 +181,18 @@ def upload_points_to_ee(file):
                     props = feature_obj.get("properties", {"id": i})
                     features.append(ee.Feature(ee.Geometry(geom), props))
                 except Exception as e:
-                    st.warning(f"⚠️ Skipped feature {i} due to an error: {e}")
+                    st.warning(f"Skipped feature {i} due to an error: {e}")
 
             feature_collection = ee.FeatureCollection(features)
-            st.success("✅ GeoJSON successfully uploaded and converted.")
+            st.success("GeoJSON successfully uploaded and converted.")
             return feature_collection  # Return processed data
 
         else:
-            st.error("❌ Unsupported file format. Please upload a CSV or GeoJSON file.")
+            st.error("Unsupported file format. Please upload a CSV or GeoJSON file.")
             return None
 
     except Exception as e:
-        st.error(f"⚠️ An error occurred while processing the file: {e}")
+        st.error(f"An error occurred while processing the file: {e}")
         return None
     
 
