@@ -125,18 +125,6 @@ def upload_points_to_ee(file):
             # Let user select columns
             longitude_col = st.selectbox("Select the **Longitude** column:", df.columns)
             latitude_col = st.selectbox("Select the **Latitude** column:", df.columns)
-            date_col = st.selectbox("Select the **Date** column (optional):", ["None"] + list(df.columns))
-
-            # Date format selection (only used if a date column is selected)
-            date_format = None
-            if date_col != "None":
-                date_format = st.selectbox(
-                    "Select the **Date format**:",
-                    ["Auto Detect", "YYYY-MM-DD", "MM/DD/YYYY", "DD-MM-YYYY", "Unix Timestamp"]
-                )
-            else:
-                import datetime
-                default_date = st.date_input("Since no date column is selected, choose a default date:", datetime.date(2022, 2, 22))
 
             # Button to confirm processing
             if st.button("Confirm and Process Data"):
@@ -148,14 +136,8 @@ def upload_points_to_ee(file):
                     if longitude is None or latitude is None:
                         return None  # Skip rows with invalid coordinates
 
-                    # Handle date
-                    if date_col != "None":
-                        dam_date = parse_date(row[date_col], date_format)
-                    else:
-                        dam_date = default_date.isoformat()
-
-                    # Create properties dictionary
-                    properties = {"date": dam_date}
+                    # Create properties dictionary (empty or add more if needed)
+                    properties = {}
 
                     # Convert to Earth Engine feature
                     return ee.Feature(ee.Geometry.Point([longitude, latitude]), properties)
@@ -200,7 +182,6 @@ def upload_points_to_ee(file):
     except Exception as e:
         st.error(f"An error occurred while processing the file: {e}")
         return None
-
 
 # Older Version of the function
 # def upload_points_to_ee(file):
