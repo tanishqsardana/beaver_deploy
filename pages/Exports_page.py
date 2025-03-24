@@ -61,93 +61,95 @@ if "Positive_collection" not in st.session_state:
 st.title("Analyzing the Impact of Beaver Dams")
 
 # Section: Upload Points
-st.header("Upload Points")
+st.header("Upload Dam Locations")
 st.write(
     "The points must contain the following properties: longitude, latitude, Dam (positive or negative), date (YYYY-MM-DD), DamID."
 )
 
 # File upload
-uploaded_file = st.file_uploader("Choose a CSV or GeoJSON file", type=["csv", "geojson"])
+uploaded_file = st.file_uploader("Choose a CSV or GeoJSON file", type=["csv", "geojson"],key="Dam_file_uploader")
 
 if uploaded_file:
-    feature_collection = upload_points_to_ee(uploaded_file)
+    # feature_collection = upload_points_to_ee(uploaded_file)
+    feature_collection = upload_points_to_ee(uploaded_file, widget_prefix="Dam")
     if feature_collection:
         st.session_state.Positive_collection = feature_collection  # Save to session state
         st.session_state['Full_positive'] = st.session_state.Positive_collection
 
+if 'Full_positive' in st.session_state:
+        Positives_map = geemap.Map()
+        Positives_map.add_basemap("SATELLITE")
+        Positives_map.centerObject(st.session_state['Full_positive'])
+        Positives_map.addLayer(st.session_state['Full_positive'],{'color': 'blue'},'Dams')
+
+        st.write("Dam Locations (blue points):")
+        Positives_map.to_streamlit(width=1200, height=700)
+        
         # st.write("Standardized Feature Collection:")
         # st.json(geemap.ee_to_geojson(feature_collection))
 
 
 # Section: Draw Points
-st.subheader("Draw Points (optional)")
-enable_drawing = st.checkbox("Enable drawing on the map")
+# st.subheader("Draw Points (optional)")
+# enable_drawing = st.checkbox("Enable drawing on the map")
 
-# Initialize map
-map_center = [39.7538, -98.4439]
-draw_map = folium.Map(location=map_center, zoom_start=4)
+# # Initialize map
+# map_center = [39.7538, -98.4439]
+# draw_map = folium.Map(location=map_center, zoom_start=4)
 
-folium.TileLayer(
-    tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    attr="Esri",
-    name="Esri Satellite",
-    overlay=False,
-    control=True,
-).add_to(draw_map)
+# folium.TileLayer(
+#     tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+#     attr="Esri",
+#     name="Esri Satellite",
+#     overlay=False,
+#     control=True,
+# ).add_to(draw_map)
 
-# Add uploaded points to the map
-if st.session_state.Positive_collection:
-    geojson_layer = geemap.ee_to_geojson(st.session_state.Positive_collection)
-    folium.GeoJson(geojson_layer, name="Uploaded Points").add_to(draw_map)
+# # Add uploaded points to the map
+# if st.session_state.Positive_collection:
+#     geojson_layer = geemap.ee_to_geojson(st.session_state.Positive_collection)
+#     folium.GeoJson(geojson_layer, name="Uploaded Points").add_to(draw_map)
 
-# Add drawing functionality if enabled
-if enable_drawing:
-    draw = Draw(
-        export=True,
-        filename="points.geojson",
-        draw_options={
-            "rectangle": False,
-            "polygon": False,
-            "circle": False,
-            "polyline": False,
-            "marker": True,  # Enable marker tool for points
-        },
-        edit_options={"remove": True},
-    )
-    draw.add_to(draw_map)
+# # Add drawing functionality if enabled
+# if enable_drawing:
+#     draw = Draw(
+#         export=True,
+#         filename="points.geojson",
+#         draw_options={
+#             "rectangle": False,
+#             "polygon": False,
+#             "circle": False,
+#             "polyline": False,
+#             "marker": True,  # Enable marker tool for points
+#         },
+#         edit_options={"remove": True},
+#     )
+#     draw.add_to(draw_map)
 
-folium.LayerControl().add_to(draw_map)
-st_data = st_folium(draw_map, width=1200, height=700, key="main_map")
+# folium.LayerControl().add_to(draw_map)
+# st_data = st_folium(draw_map, width=1200, height=700, key="main_map")
 
-# Process drawn points and append to points list
-points_list = []
-if enable_drawing and st_data and "all_drawings" in st_data:
-    geojson_list = st_data["all_drawings"]
-    if geojson_list:
-        for geojson in geojson_list:
-            if geojson and "geometry" in geojson:
-                coordinates = geojson["geometry"]["coordinates"]
-                points_list.append(coordinates)
-
-
-
-
-if points_list:
-    ee_points = ee.FeatureCollection(
-        [ee.Feature(ee.Geometry.Point(coord), {"id": idx}) for idx, coord in enumerate(points_list)]
-    )
-    if st.session_state.Positive_collection:
-        st.session_state.Positive_collection = st.session_state.Positive_collection.merge(ee_points)
-    else:
-        st.session_state.Positive_collection = ee_points
+# # Process drawn points and append to points list
+# points_list = []
+# if enable_drawing and st_data and "all_drawings" in st_data:
+#     geojson_list = st_data["all_drawings"]
+#     if geojson_list:
+#         for geojson in geojson_list:
+#             if geojson and "geometry" in geojson:
+#                 coordinates = geojson["geometry"]["coordinates"]
+#                 points_list.append(coordinates)
 
 
 
 
-# Combined Dam Status and Buffering Section
-if "Combined_collection" not in st.session_state:
-    st.session_state.Combined_collection = None
-        # st.session_state.Positive_collection = feature_collection
+# if points_list:
+#     ee_points = ee.FeatureCollection(
+#         [ee.Feature(ee.Geometry.Point(coord), {"id": idx}) for idx, coord in enumerate(points_list)]
+#     )
+#     if st.session_state.Positive_collection:
+#         st.session_state.Positive_collection = st.session_state.Positive_collection.merge(ee_points)
+#     else:
+#         st.session_state.Positive_collection = ee_points
 if "selected_waterway" not in st.session_state:
     st.session_state.selected_waterway = None  # Selected hydro dataset
 if "dataset_loaded" not in st.session_state:
@@ -155,169 +157,238 @@ if "dataset_loaded" not in st.session_state:
 
 
 
-# Step 1: Upload Waterway
 if 'Full_positive' in st.session_state:
-    # st.header("Upload Waterway")
-    st.header("Generate Negative Locations")
-    st.subheader("1. Choose Waterway Map to generate negatives- choose one")
-    upload_own_checkbox = st.checkbox("Upload Own Dataset")
-    choose_existing_checkbox = st.checkbox("Choose an Existing Dataset")
+    st.header("Select Waterway")
+    positive_dam_bounds = st.session_state['Full_positive'].geometry().bounds()
+    states_dataset = ee.FeatureCollection("TIGER/2018/States")  # US States boundaries dataset
+    states_with_dams = states_dataset.filterBounds(positive_dam_bounds)
+    st.session_state['Positive_dam_state'] = states_with_dams
+    states_geo = st.session_state['Positive_dam_state']
+    state_names = states_geo.aggregate_array("NAME").getInfo()
 
-    # Create a map to display datasets
-    Waterway_map = geemap.Map()
-    Waterway_map.add_basemap("SATELLITE")
+    if not state_names:
+        st.error("No states found within the Dam data bounds.")
+    else:
+        st.write(f"States within Dam data bounds: {state_names}")
 
-    # Handle "Upload Own Dataset"
-    if upload_own_checkbox:
-        asset_id = st.text_input("Enter the GEE Asset Table ID for your dataset (e.g., projects/ee-beaver-lab/assets/Hydro/MA_Hydro_arc):")
-        if st.button("Load Uploaded Dataset"):
-            try:
-                waterway_own = ee.FeatureCollection(asset_id)
-                st.session_state.selected_waterway = waterway_own
+    # Dropdown for dataset options
+    dataset_option = st.selectbox(
+        "Choose a dataset for waterways:",
+        ["Choose", "WWF Free Flowing Rivers", "NHD by State"]
+    )
+
+    # Button to confirm dataset selection
+    if st.button("Load Existing Dataset"):
+        try:
+            if dataset_option == "WWF Free Flowing Rivers":
+                wwf_dataset = ee.FeatureCollection("WWF/HydroSHEDS/v1/FreeFlowingRivers")
+                clipped_wwf = wwf_dataset.filterBounds(states_with_dams)
+                st.session_state.selected_waterway = clipped_wwf
                 st.session_state.dataset_loaded = True
-                st.success("Uploaded dataset loaded and added to the map.")
-            except Exception as e:
-                st.error(f"Failed to load the dataset. Error: {e}")
+                st.success("WWF dataset loaded and added to the map.")
 
-    # Handle "Choose an Existing Dataset"
-    if choose_existing_checkbox:
-        if 'Full_positive' in st.session_state:
-            positive_dam_bounds = st.session_state['Full_positive'].geometry().bounds()
-            states_dataset = ee.FeatureCollection("TIGER/2018/States")  # US States boundaries dataset
-            states_with_dams = states_dataset.filterBounds(positive_dam_bounds)
-            st.session_state['Positive_dam_state'] = states_with_dams
-            states_geo = st.session_state['Positive_dam_state']
-            state_names = states_geo.aggregate_array("NAME").getInfo()
+            elif dataset_option == "NHD by State":
+                state_initials = {
+                    "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR", "California": "CA",
+                    "Colorado": "CO", "Connecticut": "CT", "Delaware": "DE", "Florida": "FL", "Georgia": "GA",
+                    "Hawaii": "HI", "Idaho": "ID", "Illinois": "IL", "Indiana": "IN", "Iowa": "IA",
+                    "Kansas": "KS", "Kentucky": "KY", "Louisiana": "LA", "Maine": "ME", "Maryland": "MD",
+                    "Massachusetts": "MA", "Michigan": "MI", "Minnesota": "MN", "Mississippi": "MS",
+                    "Missouri": "MO", "Montana": "MT", "Nebraska": "NE", "Nevada": "NV", "New Hampshire": "NH",
+                    "New Jersey": "NJ", "New Mexico": "NM", "New York": "NY", "North Carolina": "NC",
+                    "North Dakota": "ND", "Ohio": "OH", "Oklahoma": "OK", "Oregon": "OR", "Pennsylvania": "PA",
+                    "Rhode Island": "RI", "South Carolina": "SC", "South Dakota": "SD", "Tennessee": "TN",
+                    "Texas": "TX", "Utah": "UT", "Vermont": "VT", "Virginia": "VA", "Washington": "WA",
+                    "West Virginia": "WV", "Wisconsin": "WI", "Wyoming": "WY"
+                }
 
-            if not state_names:
-                st.error("No states found within the Dam data bounds.")
-            else:
-                st.write(f"States within Dam data bounds: {state_names}")
+                nhd_collections = []
+                for state in state_names:
+                    state_initial = state_initials.get(state)
+                    if state_initial:
+                        nhd_dataset = ee.FeatureCollection(
+                            f'projects/sat-io/open-datasets/NHD/NHD_{state_initial}/NHDFlowline'
+                        )
+                        nhd_collections.append(nhd_dataset)
 
-                # Dropdown for dataset options
-                dataset_option = st.selectbox(
-                    "Choose a dataset for waterways:",
-                    ["Choose", "WWF Free Flowing Rivers", "NHD by State"]
-                )
-
-                # Button to confirm dataset selection
-                if st.button("Load Existing Dataset"):
-                    try:
-                        if dataset_option == "WWF Free Flowing Rivers":
-                            wwf_dataset = ee.FeatureCollection("WWF/HydroSHEDS/v1/FreeFlowingRivers")
-                            clipped_wwf = wwf_dataset.filterBounds(states_with_dams)
-                            st.session_state.selected_waterway = clipped_wwf
-                            st.session_state.dataset_loaded = True
-                            st.success("WWF dataset loaded and added to the map.")
-
-                        elif dataset_option == "NHD by State":
-                            state_initials = {
-                                "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR", "California": "CA",
-                                "Colorado": "CO", "Connecticut": "CT", "Delaware": "DE", "Florida": "FL", "Georgia": "GA",
-                                "Hawaii": "HI", "Idaho": "ID", "Illinois": "IL", "Indiana": "IN", "Iowa": "IA",
-                                "Kansas": "KS", "Kentucky": "KY", "Louisiana": "LA", "Maine": "ME", "Maryland": "MD",
-                                "Massachusetts": "MA", "Michigan": "MI", "Minnesota": "MN", "Mississippi": "MS",
-                                "Missouri": "MO", "Montana": "MT", "Nebraska": "NE", "Nevada": "NV", "New Hampshire": "NH",
-                                "New Jersey": "NJ", "New Mexico": "NM", "New York": "NY", "North Carolina": "NC",
-                                "North Dakota": "ND", "Ohio": "OH", "Oklahoma": "OK", "Oregon": "OR", "Pennsylvania": "PA",
-                                "Rhode Island": "RI", "South Carolina": "SC", "South Dakota": "SD", "Tennessee": "TN",
-                                "Texas": "TX", "Utah": "UT", "Vermont": "VT", "Virginia": "VA", "Washington": "WA",
-                                "West Virginia": "WV", "Wisconsin": "WI", "Wyoming": "WY"
-                            }
-
-                            nhd_collections = []
-                            for state in state_names:
-                                state_initial = state_initials.get(state)
-                                if state_initial:
-                                    nhd_dataset = ee.FeatureCollection(
-                                        f'projects/sat-io/open-datasets/NHD/NHD_{state_initial}/NHDFlowline'
-                                    )
-                                    nhd_collections.append(nhd_dataset)
-
-                            # Merge all NHD datasets
-                            if nhd_collections:
-                                merged_nhd = ee.FeatureCollection(nhd_collections).flatten()
-                                st.session_state.selected_waterway = merged_nhd
-                                st.session_state['Waterway'] = st.session_state.selected_waterway
-                                st.session_state.dataset_loaded = True
-                                st.success("NHD datasets for selected states loaded and added to the map.")
-                            else:
-                                st.error("No NHD datasets found for the selected states.")
-                    except Exception as e:
-                        st.error(f"Failed to load the dataset. Error: {e}")
+                # Merge all NHD datasets
+                if nhd_collections:
+                    merged_nhd = ee.FeatureCollection(nhd_collections).flatten()
+                    st.session_state.selected_waterway = merged_nhd
+                    st.session_state['Waterway'] = st.session_state.selected_waterway
+                    st.session_state.dataset_loaded = True
+                    st.success("NHD datasets for selected states loaded and added to the map.")
+                else:
+                    st.error("No NHD datasets found for the selected states.")
+        except Exception as e:
+            st.error(f"Failed to load the dataset. Error: {e}")
 
     # Display the map
     if 'Waterway' in st.session_state:
-        Waterway_map.centerObject(st.session_state['Full_positive'],zoom = 10)
-        Waterway_map.addLayer(st.session_state.selected_waterway, {"color": "blue"}, "Selected Waterway")
+        Waterway_map = geemap.Map()
+        Waterway_map.add_basemap("SATELLITE")
+        Waterway_map.centerObject(st.session_state['Full_positive'])
         Waterway_map.addLayer(st.session_state['Full_positive'],{'color': 'FF0000'},'Dams')
-
-        st.write("Waterway Map:")
+        Waterway_map.addLayer(st.session_state.selected_waterway, {"color": "blue"}, "Selected Waterway")
         Waterway_map.to_streamlit(width=1200, height=700)
 
+
+
+# Combined Dam Status and Buffering Section
+if "Combined_collection" not in st.session_state:
+    st.session_state.Combined_collection = None
+        # st.session_state.Positive_collection = feature_collection
+
+
+# Step 1: Upload Waterway
 if 'Waterway' in st.session_state:
-    st.subheader("2. Specify the parameters for negative point generation:")
+    # st.header("Upload Waterway")
+    st.header("Upload or Generate Non-Dam Locations")
+    upload_negatives_checkbox = st.checkbox("Upload Non-Dam Dataset (must be on a waterbody)")
+    generate_negatives_checkbox = st.checkbox("Generate Non-Dam Locations")
 
-    # User inputs for buffer radii & sampling scale
-    innerRadius = st.number_input("Inner Radius (meters)", value=500, min_value=0, step=50)
-    outerRadius = st.number_input("Outer Radius (meters)", value=5000, min_value=0, step=100)
-    samplingScale = st.number_input("Sampling Scale (meters)", value=10, min_value=1, step=1)
-    
-    # Input for the date year
-    if st.button("Generate Negative Points"):
-        with st.spinner("Generating negative points..."):
-            # 1) Deduplicate Positive Dams and get centroids
-            first_pos = st.session_state.Positive_collection.first()
-            date = ee.Date(first_pos.get('date'))
-            year_string = date.format('YYYY')
-            full_date = ee.String(year_string).cat('-07-01')
+    if upload_negatives_checkbox:
+        uploaded_negatives_file = st.file_uploader("Choose a CSV or GeoJSON file", type=["csv", "geojson"],key="Non_Dam_file_uploader")
+        if uploaded_negatives_file:
+            # negative_feature_collection = upload_points_to_ee(uploaded_negatives_file)
+            negative_feature_collection = upload_points_to_ee(uploaded_negatives_file,widget_prefix="NonDam")
+            st.success("Locations uploaded!")
+            if negative_feature_collection:
+                st.session_state.Negative_upload_collection = negative_feature_collection  # Save to session state
+                st.session_state['Full_negative'] = st.session_state.Negative_upload_collection
+
+                first_pos = st.session_state.Positive_collection.first()
+                date = ee.Date(first_pos.get('date'))
+                year_string = date.format('YYYY')
+                full_date = ee.String(year_string).cat('-07-01')
+            
+                negativePoints = negative_feature_collection.map(lambda feature: feature.set('Dam', 'negative').set("date",full_date))
+                
+                fc = negativePoints
+                features_list = fc.toList(fc.size())
+                indices = ee.List.sequence(0, fc.size().subtract(1))
+                
+                def set_id_negatives2(idx):
+                    idx = ee.Number(idx)
+                    feature = ee.Feature(features_list.get(idx))
+                    # Cast idx.add(1) to an integer and then format as a string without decimals.
+                    labeled_feature = feature.set(
+                        'id_property', ee.String('N').cat(idx.add(1).int().format())
+                    )
+                    return labeled_feature
+                Neg_points_id = ee.FeatureCollection(indices.map(set_id_negatives2))
+
+                Pos_collection = st.session_state.Positive_collection
+                Pos_collection = Pos_collection.map(lambda feature: feature.set('Dam', 'positive'))
+
+                pos_features_list = Pos_collection.toList(Pos_collection.size())
+                pos_indices = ee.List.sequence(0, Pos_collection.size().subtract(1))
+
+                def set_id_positives(idx):
+                    idx = ee.Number(idx)
+                    feature = ee.Feature(pos_features_list.get(idx))
+                    labeled_feature = feature.set(
+                        'id_property', ee.String('P').cat(idx.add(1).int().format())
+                    )
+                    return labeled_feature
+
+                Positive_dam_id = ee.FeatureCollection(pos_indices.map(set_id_positives))
+
+                # Positive_Dams = st.session_state.Positive_collection
+                # Positive_dam_id = Positive_Dams.map(lambda feature: feature.set('Dam', 'positive'))
+                # Positive_dam_id = Positive_dam_id
+                Merged_collection = Positive_dam_id.merge(Neg_points_id)
+                st.session_state['Merged_collection'] = Merged_collection
+
+                Negatives_map = geemap.Map()
+                Negatives_map.add_basemap("SATELLITE")
+                Negatives_map.addLayer(negativePoints,{'color': 'red', 'width': 2},'Negative')
+                Negatives_map.addLayer(Positive_dam_id,{'color': 'blue'},'Positive')
+                Negatives_map.centerObject(Merged_collection)
+                Negatives_map.to_streamlit(width=1200, height=700)
+
+            
+
+
+
+    if generate_negatives_checkbox:
+        st.subheader("Specify the parameters for negative point generation:")
+
+        # User inputs for buffer radii & sampling scale
+        innerRadius = st.number_input("Inner Radius (meters)", value=500, min_value=0, step=50)
+        outerRadius = st.number_input("Outer Radius (meters)", value=5000, min_value=0, step=100)
+        samplingScale = st.number_input("Sampling Scale (meters)", value=10, min_value=1, step=1)
         
-
-
-            positive_dams_fc = deduplicate_locations(st.session_state.Positive_collection)
-            
-            # 2) Convert waterway feature collection to a raster mask
-            waterway_fc = st.session_state.selected_waterway  # The loaded hydro dataset
-            hydroRaster = prepareHydro(waterway_fc)
-            
-            # 3) Sample negative points
-            negativePoints = sampleNegativePoints(
-                positive_dams_fc, 
-                hydroRaster, 
-                innerRadius, 
-                outerRadius, 
-                samplingScale
-            )
-            negativePoints = negativePoints.map(lambda feature: feature.set('Dam', 'negative').set("date",full_date))
-            
-            fc = negativePoints
-            features_list = fc.toList(fc.size())
-            indices = ee.List.sequence(0, fc.size().subtract(1))
-            # Step 3: Map over the indices to get each feature and set a new property.
+        # Input for the date year
+        if st.button("Generate Negative Points"):
+            with st.spinner("Generating negative points..."):
+                # 1) Deduplicate Positive Dams and get centroids
+                first_pos = st.session_state.Positive_collection.first()
+                date = ee.Date(first_pos.get('date'))
+                year_string = date.format('YYYY')
+                full_date = ee.String(year_string).cat('-07-01')
             
 
-            def set_id_negatives2(idx):
-                idx = ee.Number(idx)
-                feature = ee.Feature(features_list.get(idx))
-                # Cast idx.add(1) to an integer and then format as a string without decimals.
-                labeled_feature = feature.set(
-                    'id_property', ee.String('N').cat(idx.add(1).int().format())
+                positive_dams_fc = deduplicate_locations(st.session_state.Positive_collection)
+                
+                # 2) Convert waterway feature collection to a raster mask
+                waterway_fc = st.session_state.selected_waterway  # The loaded hydro dataset
+                hydroRaster = prepareHydro(waterway_fc)
+                
+                # 3) Sample negative points
+                negativePoints = sampleNegativePoints(
+                    positive_dams_fc, 
+                    hydroRaster, 
+                    innerRadius, 
+                    outerRadius, 
+                    samplingScale
                 )
-                return labeled_feature
-            Neg_points_id = ee.FeatureCollection(indices.map(set_id_negatives2))
-            # Neg_points_id = ee.FeatureCollection(indices.map(set_id_negatives))
-            Positive_Dams = st.session_state.Positive_collection
-            Positive_dam_id = Positive_Dams.map(lambda feature: feature.set('Dam', 'positive').set('id_property', feature.get('DamID')))
-            Merged_collection = Positive_dam_id.merge(Neg_points_id)
-            st.session_state['Merged_collection'] = Merged_collection
+                negativePoints = negativePoints.map(lambda feature: feature.set('Dam', 'negative').set("date",full_date))
+                
+                fc = negativePoints
+                features_list = fc.toList(fc.size())
+                indices = ee.List.sequence(0, fc.size().subtract(1))
+                # Step 3: Map over the indices to get each feature and set a new property.
+                
 
-            Negative_points = geemap.Map()
-            Negative_points.add_basemap("SATELLITE")
-            Negative_points.addLayer(negativePoints,{'color': 'red', 'width': 2},'Negative')
-            Negative_points.addLayer(Positive_dam_id,{'color': 'blue'},'Positive')
-            Negative_points.centerObject(Merged_collection)
-            Negative_points.to_streamlit(width=1200, height=700)
-            
+                def set_id_negatives2(idx):
+                    idx = ee.Number(idx)
+                    feature = ee.Feature(features_list.get(idx))
+                    # Cast idx.add(1) to an integer and then format as a string without decimals.
+                    labeled_feature = feature.set(
+                        'id_property', ee.String('N').cat(idx.add(1).int().format())
+                    )
+                    return labeled_feature
+                
+                Neg_points_id = ee.FeatureCollection(indices.map(set_id_negatives2))
+                
+                Pos_collection = st.session_state.Positive_collection
+                Pos_collection = Pos_collection.map(lambda feature: feature.set('Dam', 'positive'))
+
+                pos_features_list = Pos_collection.toList(Pos_collection.size())
+                pos_indices = ee.List.sequence(0, Pos_collection.size().subtract(1))
+
+                def set_id_positives(idx):
+                    idx = ee.Number(idx)
+                    feature = ee.Feature(pos_features_list.get(idx))
+                    labeled_feature = feature.set(
+                        'id_property', ee.String('P').cat(idx.add(1).int().format())
+                    )
+                    return labeled_feature
+
+                Positive_dam_id = ee.FeatureCollection(pos_indices.map(set_id_positives))
+                # Positive_Dams = st.session_state.Positive_collection
+                # Positive_dam_id = Positive_Dams.map(lambda feature: feature.set('Dam', 'positive').set('id_property', feature.get('DamID')))
+                Merged_collection = Positive_dam_id.merge(Neg_points_id)
+                st.session_state['Merged_collection'] = Merged_collection
+
+                Negative_points = geemap.Map()
+                Negative_points.add_basemap("SATELLITE")
+                Negative_points.addLayer(negativePoints,{'color': 'red', 'width': 2},'Negative')
+                Negative_points.addLayer(Positive_dam_id,{'color': 'blue'},'Positive')
+                Negative_points.centerObject(Merged_collection)
+                Negative_points.to_streamlit(width=1200, height=700)
+        
 
 if "buffer_radius" not in st.session_state:
     st.session_state.buffer_radius = 200
@@ -325,28 +396,30 @@ if "year_selection" not in st.session_state:
     st.session_state.year_selection = 2020
 
 if 'Merged_collection' in st.session_state:
-    st.subheader("3. Buffer dam locations:")
+    st.header("Merge and Buffer Dam and Non Dam locations:")
 
     # User inputs for Dam status and buffer radius
     buffer_radius = st.number_input(
         "Enter buffer radius (meters):", min_value=1, step=1, value=st.session_state.buffer_radius
     )
-    year_selection = st.number_input(
-        "Enter year (between 2017-2024):", min_value=1, step=1, value=st.session_state.year_selection
-    )
 
     # Button to apply Dam status and create buffers
     if st.button("Apply Dam Status and Create Buffers"):
         # Apply the function to the feature collection
-        Merged_col = st.session_state['Merged_collection']
+
+        first_pos = st.session_state.Positive_collection.first()
+        date = ee.Date(first_pos.get('date'))
+        year_string = date.format('YYYY')
+        full_date = ee.String(year_string).cat('-07-01')
+
 
         def add_dam_buffer_and_standardize_date(feature):
             # Add Dam property and other metadata
             dam_status = feature.get("Dam")
             
             # Force the date to July 1st of the specified year
-            standardized_date = ee.Date.fromYMD(year_selection, 7, 1)
-            formatted_date = standardized_date.format('YYYYMMdd')
+            standardized_date = date
+            formatted_date = date.format('YYYYMMdd')
             
             # Buffer geometry while retaining properties
             buffered_geometry = feature.geometry().buffer(buffer_radius)
@@ -366,6 +439,7 @@ if 'Merged_collection' in st.session_state:
 
         # Select only relevant properties
         Dam_data = Buffered_collection.select(['id_property', 'Dam', 'Survey_Date', 'Damdate', 'Point_geo'])
+        # Dam_data = Buffered_collection.select(['Dam', 'Survey_Date', 'Damdate', 'Point_geo'])
 
         # Save to session state
         st.session_state['Dam_data'] = Dam_data

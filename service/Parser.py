@@ -88,7 +88,107 @@ def parse_date(value, date_format):
     except Exception:
         return None  # Return None if the date cannot be parsed
 
-def upload_points_to_ee(file):
+# def upload_points_to_ee(file):
+#     """
+#     Handles CSV and GeoJSON uploads, standardizes data, and converts them into an
+#     Earth Engine FeatureCollection. Allows the user to assign a fixed date based on selected year.
+#     """
+#     if not file:
+#         return None
+
+#     try:
+#         if file.name.endswith(".csv"):
+#             file.seek(0)
+
+#             delimiter_display = {",": "Comma (,)", ";": "Semicolon (;)", "\t": "Tab (\\t)"}
+#             delimiter_key = st.selectbox("Select delimiter used in CSV:", list(delimiter_display.values()), index=0)
+#             delimiter = [k for k, v in delimiter_display.items() if v == delimiter_key][0]
+
+#             df_preview = pd.read_csv(file, delimiter=delimiter, dtype=str, encoding="utf-8", nrows=5, header=None)
+#             st.write("**Preview of the uploaded file:**")
+#             st.dataframe(df_preview)
+
+#             file.seek(0)
+
+#             header_option = st.radio("Does the file contain headers?", ["Yes", "No"], index=0)
+#             if header_option == "Yes":
+#                 df = pd.read_csv(file, delimiter=delimiter, header=0, encoding="utf-8")
+#             else:
+#                 df = pd.read_csv(file, delimiter=delimiter, header=None, encoding="utf-8")
+#                 df.columns = [f"column{i}" for i in range(len(df.columns))]
+
+#             longitude_col = st.selectbox("Select the **Longitude** column:", df.columns)
+#             latitude_col = st.selectbox("Select the **Latitude** column:", df.columns)
+
+#             # Year selection & default prompt
+#             selected_year = st.selectbox("Select a year (default date will be July 1 of selected year):", list(range(2017, 2025)), index=3)
+#             selected_date = f"{selected_year}-07-01"
+
+#             # ET availability warning
+#             if selected_year < 2020 or selected_year > 2025:
+#                 st.warning("You may proceed to next steps, but ET data may not be available for the selected year.")
+
+#             if st.button("Confirm and Process Data"):
+#                 def standardize_feature(row):
+#                     longitude = clean_coordinate(row[longitude_col])
+#                     latitude = clean_coordinate(row[latitude_col])
+
+#                     if longitude is None or latitude is None:
+#                         return None
+
+#                     properties = {"date": selected_date}
+#                     return ee.Feature(ee.Geometry.Point([longitude, latitude]), properties)
+
+#                 standardized_features = list(filter(None, df.apply(standardize_feature, axis=1).tolist()))
+#                 feature_collection = ee.FeatureCollection(standardized_features)
+
+#                 st.success("CSV successfully uploaded and standardized.")
+#                 return feature_collection
+
+#         elif file.name.endswith(".geojson"):
+#             file.seek(0)
+#             try:
+#                 geojson = json.load(file)
+#             except json.JSONDecodeError:
+#                 st.error("Invalid GeoJSON file format.")
+#                 return None
+
+#             if "features" not in geojson or not isinstance(geojson["features"], list):
+#                 st.error("Invalid GeoJSON format: missing 'features' key.")
+#                 return None
+
+#             # year selection & default prompt
+#             selected_year = st.selectbox("Select a year (default date will be July 1 of selected year):", list(range(2017, 2025)), index=3)
+#             selected_date = f"{selected_year}-07-01"
+
+#             if selected_year < 2020 or selected_year > 2025:
+#                 st.warning("You may proceed to next steps, but ET data may not be available for the selected year.")
+
+#             if st.button("Confirm and Process GeoJSON"):
+#                 features = []
+#                 for i, feature_obj in enumerate(geojson["features"]):
+#                     try:
+#                         geom = feature_obj.get("geometry")
+#                         props = feature_obj.get("properties", {"id": i})
+#                         props["date"] = selected_date  # Add the selected date to the properties
+#                         features.append(ee.Feature(ee.Geometry(geom), props))
+#                     except Exception as e:
+#                         st.warning(f"Skipped feature {i} due to an error: {e}")
+
+#                 feature_collection = ee.FeatureCollection(features)
+#                 st.success("GeoJSON successfully uploaded and converted.")
+#                 return feature_collection
+
+#         else:
+#             st.error("Unsupported file format. Please upload a CSV or GeoJSON file.")
+#             return None
+
+#     except Exception as e:
+#         st.error(f"An error occurred while processing the file: {e}")
+#         return None
+
+
+def upload_points_to_ee(file, widget_prefix=""):
     """
     Handles CSV and GeoJSON uploads, standardizes data, and converts them into an
     Earth Engine FeatureCollection. Allows the user to assign a fixed date based on selected year.
@@ -101,7 +201,12 @@ def upload_points_to_ee(file):
             file.seek(0)
 
             delimiter_display = {",": "Comma (,)", ";": "Semicolon (;)", "\t": "Tab (\\t)"}
-            delimiter_key = st.selectbox("Select delimiter used in CSV:", list(delimiter_display.values()), index=0)
+            delimiter_key = st.selectbox(
+                "Select delimiter used in CSV:",
+                list(delimiter_display.values()),
+                index=0,
+                key=f"{widget_prefix}_delimiter_selectbox"
+            )
             delimiter = [k for k, v in delimiter_display.items() if v == delimiter_key][0]
 
             df_preview = pd.read_csv(file, delimiter=delimiter, dtype=str, encoding="utf-8", nrows=5, header=None)
@@ -110,25 +215,43 @@ def upload_points_to_ee(file):
 
             file.seek(0)
 
-            header_option = st.radio("Does the file contain headers?", ["Yes", "No"], index=0)
+            header_option = st.radio(
+                "Does the file contain headers?",
+                ["Yes", "No"],
+                index=0,
+                key=f"{widget_prefix}_header_radio"
+            )
             if header_option == "Yes":
                 df = pd.read_csv(file, delimiter=delimiter, header=0, encoding="utf-8")
             else:
                 df = pd.read_csv(file, delimiter=delimiter, header=None, encoding="utf-8")
                 df.columns = [f"column{i}" for i in range(len(df.columns))]
 
-            longitude_col = st.selectbox("Select the **Longitude** column:", df.columns)
-            latitude_col = st.selectbox("Select the **Latitude** column:", df.columns)
+            longitude_col = st.selectbox(
+                "Select the **Longitude** column:",
+                df.columns,
+                key=f"{widget_prefix}_longitude_selectbox"
+            )
+            latitude_col = st.selectbox(
+                "Select the **Latitude** column:",
+                df.columns,
+                key=f"{widget_prefix}_latitude_selectbox"
+            )
 
             # Year selection & default prompt
-            selected_year = st.selectbox("Select a year (default date will be July 1 of selected year):", list(range(2017, 2025)), index=3)
+            selected_year = st.selectbox(
+                "Select a year (default date will be July 1 of selected year):",
+                list(range(2017, 2025)),
+                index=3,
+                key=f"{widget_prefix}_year_selectbox"
+            )
             selected_date = f"{selected_year}-07-01"
 
             # ET availability warning
             if selected_year < 2020 or selected_year > 2025:
                 st.warning("You may proceed to next steps, but ET data may not be available for the selected year.")
 
-            if st.button("Confirm and Process Data"):
+            if st.button("Confirm and Process Data", key=f"{widget_prefix}_process_data_button"):
                 def standardize_feature(row):
                     longitude = clean_coordinate(row[longitude_col])
                     latitude = clean_coordinate(row[latitude_col])
@@ -158,13 +281,18 @@ def upload_points_to_ee(file):
                 return None
 
             # year selection & default prompt
-            selected_year = st.selectbox("Select a year (default date will be July 1 of selected year):", list(range(2017, 2025)), index=3)
+            selected_year = st.selectbox(
+                "Select a year (default date will be July 1 of selected year):",
+                list(range(2017, 2025)),
+                index=3,
+                key=f"{widget_prefix}_geojson_year_selectbox"
+            )
             selected_date = f"{selected_year}-07-01"
 
             if selected_year < 2020 or selected_year > 2025:
                 st.warning("You may proceed to next steps, but ET data may not be available for the selected year.")
 
-            if st.button("Confirm and Process GeoJSON"):
+            if st.button("Confirm and Process GeoJSON", key=f"{widget_prefix}_geojson_process_button"):
                 features = []
                 for i, feature_obj in enumerate(geojson["features"]):
                     try:
