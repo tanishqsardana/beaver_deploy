@@ -9,6 +9,8 @@ import geemap.foliumap as geemap
 from streamlit_folium import folium_static
 from scipy.stats import gaussian_kde
 from sklearn.metrics import roc_curve, auc, accuracy_score
+import csv
+import io
 import ee 
 import os
 import numpy as np
@@ -88,6 +90,8 @@ def parse_date(value, date_format):
     except Exception:
         return None  # Return None if the date cannot be parsed
 
+
+####### Original chris parser- doesnt include widgit 
 # def upload_points_to_ee(file):
 #     """
 #     Handles CSV and GeoJSON uploads, standardizes data, and converts them into an
@@ -187,12 +191,8 @@ def parse_date(value, date_format):
 #         st.error(f"An error occurred while processing the file: {e}")
 #         return None
 
-
+##### Modified parser to include widgit_prefix and autodetect header
 def upload_points_to_ee(file, widget_prefix=""):
-    """
-    Handles CSV and GeoJSON uploads, standardizes data, and converts them into an
-    Earth Engine FeatureCollection. Allows the user to assign a fixed date based on selected year.
-    """
     if not file:
         return None
 
@@ -200,6 +200,7 @@ def upload_points_to_ee(file, widget_prefix=""):
         if file.name.endswith(".csv"):
             file.seek(0)
 
+            # Let the user select a delimiter
             delimiter_display = {",": "Comma (,)", ";": "Semicolon (;)", "\t": "Tab (\\t)"}
             delimiter_key = st.selectbox(
                 "Select delimiter used in CSV:",
@@ -209,32 +210,48 @@ def upload_points_to_ee(file, widget_prefix=""):
             )
             delimiter = [k for k, v in delimiter_display.items() if v == delimiter_key][0]
 
-            df_preview = pd.read_csv(file, delimiter=delimiter, dtype=str, encoding="utf-8", nrows=5, header=None)
-            st.write("**Preview of the uploaded file:**")
-            st.dataframe(df_preview)
+            # Read a sample for header detection using csv.Sniffer
+            sample = file.read(1024)
+            try:
+                sample_str = sample.decode("utf-8")
+            except AttributeError:
+                sample_str = sample  # already a string
+            sniffer = csv.Sniffer()
+            has_header = sniffer.has_header(sample_str)
+            file.seek(0)  # Reset pointer
 
-            file.seek(0)
-
-            header_option = st.radio(
-                "Does the file contain headers?",
-                ["Yes", "No"],
-                index=0,
-                key=f"{widget_prefix}_header_radio"
-            )
-            if header_option == "Yes":
+            # Read the CSV with or without headers
+            if has_header:
                 df = pd.read_csv(file, delimiter=delimiter, header=0, encoding="utf-8")
             else:
                 df = pd.read_csv(file, delimiter=delimiter, header=None, encoding="utf-8")
                 df.columns = [f"column{i}" for i in range(len(df.columns))]
 
+            st.write("**Preview of the uploaded file:**")
+            st.dataframe(df.head(5))
+
+            # Auto-select Latitude and Longitude columns (case-insensitive)
+            columns_lower = [col.lower() for col in df.columns]
+            if "longitude" in columns_lower:
+                default_longitude = list(df.columns).index(df.columns[columns_lower.index("longitude")])
+            else:
+                default_longitude = 0
+
+            if "latitude" in columns_lower:
+                default_latitude = list(df.columns).index(df.columns[columns_lower.index("latitude")])
+            else:
+                default_latitude = 1 if len(df.columns) > 1 else 0
+
             longitude_col = st.selectbox(
                 "Select the **Longitude** column:",
-                df.columns,
+                options=df.columns,
+                index=default_longitude,
                 key=f"{widget_prefix}_longitude_selectbox"
             )
             latitude_col = st.selectbox(
                 "Select the **Latitude** column:",
-                df.columns,
+                options=df.columns,
+                index=default_latitude,
                 key=f"{widget_prefix}_latitude_selectbox"
             )
 
@@ -247,7 +264,6 @@ def upload_points_to_ee(file, widget_prefix=""):
             )
             selected_date = f"{selected_year}-07-01"
 
-            # ET availability warning
             if selected_year < 2020 or selected_year > 2025:
                 st.warning("You may proceed to next steps, but ET data may not be available for the selected year.")
 
@@ -255,10 +271,8 @@ def upload_points_to_ee(file, widget_prefix=""):
                 def standardize_feature(row):
                     longitude = clean_coordinate(row[longitude_col])
                     latitude = clean_coordinate(row[latitude_col])
-
                     if longitude is None or latitude is None:
                         return None
-
                     properties = {"date": selected_date}
                     return ee.Feature(ee.Geometry.Point([longitude, latitude]), properties)
 
@@ -280,7 +294,7 @@ def upload_points_to_ee(file, widget_prefix=""):
                 st.error("Invalid GeoJSON format: missing 'features' key.")
                 return None
 
-            # year selection & default prompt
+            # Year selection & default prompt for GeoJSON
             selected_year = st.selectbox(
                 "Select a year (default date will be July 1 of selected year):",
                 list(range(2017, 2025)),
@@ -314,6 +328,7 @@ def upload_points_to_ee(file, widget_prefix=""):
     except Exception as e:
         st.error(f"An error occurred while processing the file: {e}")
         return None
+
 
 
 # Older Version of the function
