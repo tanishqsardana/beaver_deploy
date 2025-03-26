@@ -483,6 +483,7 @@ if 'Dam_data' in st.session_state:
         Initiate_visualize = 'visualize' 
         st.session_state['Visualize_trends'] = Initiate_visualize
 
+import io  # Make sure to import io for the BytesIO functionality
 
 if 'Visualize_trends' in st.session_state:
     
@@ -508,9 +509,9 @@ if 'Visualize_trends' in st.session_state:
         df_lst['LST'] = pd.to_numeric(df_lst['LST'])
         df_lst['ET'] = pd.to_numeric(df_lst['ET'])  # <--- NEW: Ensure ET is numeric
 
-        # 5) Set up your plotting style
+        # 5) Set up your plotting style (using a white background)
         sns.set(style="whitegrid", palette="muted")
-        plt.figure(figsize=(12, 18), facecolor='none', edgecolor='none')
+        fig = plt.figure(figsize=(12, 18), facecolor='white', edgecolor='white')
 
         # 6) Sort the DataFrame by year, then month
         df_lst = df_lst.sort_values(by=['Image_year', 'Image_month'])
@@ -518,7 +519,7 @@ if 'Visualize_trends' in st.session_state:
         ############################################
         # 1) Plot NDVI
         ############################################
-        plt.subplot(4, 1, 1)
+        ax1 = fig.add_subplot(4, 1, 1)
         sns.lineplot(
             data=df_lst, 
             x="Image_month", 
@@ -526,19 +527,21 @@ if 'Visualize_trends' in st.session_state:
             hue="Dam_status", 
             style="Dam_status",
             markers=True, 
-            dashes=False
+            dashes=False,
+            ax=ax1
         )
-        plt.title('NDVI by Month for Positive and Negative Sites', fontsize=14, color='white')
-        plt.xlabel('Month', fontsize=12, color='white')
-        plt.ylabel('Mean NDVI', fontsize=12, color='white')
-        plt.legend(title='Dam Status', loc='upper right')
-        plt.xticks(range(1, 13), color='white') 
-        plt.yticks(color='white') 
+        ax1.set_title('NDVI by Month for Dam and Non-Dam Sites', fontsize=14, color='black')
+        ax1.set_xlabel('Month', fontsize=12, color='black')
+        ax1.set_ylabel('Mean NDVI', fontsize=12, color='black')
+        ax1.legend(title='Dam Status', loc='upper right')
+        ax1.set_xticks(range(1, 13))
+        ax1.tick_params(axis='x', colors='black')
+        ax1.tick_params(axis='y', colors='black')
 
         ############################################
         # 2) Plot NDWI_Green
         ############################################
-        plt.subplot(4, 1, 2)
+        ax2 = fig.add_subplot(4, 1, 2)
         sns.lineplot(
             data=df_lst, 
             x="Image_month", 
@@ -546,19 +549,21 @@ if 'Visualize_trends' in st.session_state:
             hue="Dam_status", 
             style="Dam_status",
             markers=True, 
-            dashes=False
+            dashes=False,
+            ax=ax2
         )
-        plt.title('NDWI Green by Month for Positive and Negative Sites', fontsize=14, color='white')
-        plt.xlabel('Month', fontsize=12, color='white')
-        plt.ylabel('Mean NDWI Green', fontsize=12, color='white')
-        plt.legend(title='Dam Status', loc='upper right')
-        plt.xticks(range(1, 13), color='white')  
-        plt.yticks(color='white') 
+        ax2.set_title('NDWI Green by Month for Dam and Non-Dam Sites', fontsize=14, color='black')
+        ax2.set_xlabel('Month', fontsize=12, color='black')
+        ax2.set_ylabel('Mean NDWI Green', fontsize=12, color='black')
+        ax2.legend(title='Dam Status', loc='upper right')
+        ax2.set_xticks(range(1, 13))
+        ax2.tick_params(axis='x', colors='black')
+        ax2.tick_params(axis='y', colors='black')
 
         ############################################
         # 3) Plot LST
         ############################################
-        plt.subplot(4, 1, 3)
+        ax3 = fig.add_subplot(4, 1, 3)
         sns.lineplot(
             data=df_lst,
             x="Image_month",
@@ -566,19 +571,21 @@ if 'Visualize_trends' in st.session_state:
             hue="Dam_status",
             style="Dam_status",
             markers=True,
-            dashes=False
+            dashes=False,
+            ax=ax3
         )
-        plt.title('LST by Month for Positive and Negative Sites', fontsize=14, color='white')
-        plt.xlabel('Month', fontsize=12, color='white')
-        plt.ylabel('Mean LST (°C)', fontsize=12, color='white')
-        plt.legend(title='Dam Status', loc='upper right')
-        plt.xticks(range(1, 13), color='white')  
-        plt.yticks(color='white') 
+        ax3.set_title('LST by Month for Dam and Non-Dam Sites', fontsize=14, color='black')
+        ax3.set_xlabel('Month', fontsize=12, color='black')
+        ax3.set_ylabel('Mean LST (°C)', fontsize=12, color='black')
+        ax3.legend(title='Dam Status', loc='upper right')
+        ax3.set_xticks(range(1, 13))
+        ax3.tick_params(axis='x', colors='black')
+        ax3.tick_params(axis='y', colors='black')
 
         ############################################
         # 4) Plot ET
         ############################################
-        plt.subplot(4, 1, 4)
+        ax4 = fig.add_subplot(4, 1, 4)
         sns.lineplot(
             data=df_lst,
             x="Image_month",
@@ -586,98 +593,225 @@ if 'Visualize_trends' in st.session_state:
             hue="Dam_status",
             style="Dam_status",
             markers=True,
-            dashes=False
+            dashes=False,
+            ax=ax4
         )
-        plt.title('ET by Month for Positive and Negative Sites', fontsize=14, color='white')
-        plt.xlabel('Month', fontsize=12, color='white')
-        plt.ylabel('Mean ET', fontsize=12, color='white')
-        plt.legend(title='Dam Status', loc='upper right')
-        plt.xticks(range(1, 13), color='white')  
-        plt.yticks(color='white')
+        ax4.set_title('ET by Month for Dam and Non-Dam Sites', fontsize=14, color='black')
+        ax4.set_xlabel('Month', fontsize=12, color='black')
+        ax4.set_ylabel('Mean ET', fontsize=12, color='black')
+        ax4.legend(title='Dam Status', loc='upper right')
+        ax4.set_xticks(range(1, 13))
+        ax4.tick_params(axis='x', colors='black')
+        ax4.tick_params(axis='y', colors='black')
 
         # 7) Final layout adjustments and display
-        plt.tight_layout()
-        plt.show()
-        st.pyplot(plt)
+        fig.tight_layout()
+        st.pyplot(fig)
+
+        # 8) Provide a download button to export the figure as a PNG image
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", facecolor=fig.get_facecolor())
+        buf.seek(0)
+        st.download_button(
+            label="Download Figure",
+            data=buf,
+            file_name="trends_figure.png",
+            mime="image/png"
+        )
+# if 'Visualize_trends' in st.session_state:
+    
+#     with st.spinner("Processing... this may take some time."):
+#         # Filter Imagery
+#         Dam_data = st.session_state['Dam_data']
+
+#         S2_cloud_mask_export = ee.ImageCollection(S2_Export_for_visual(Dam_data))
+#         S2_ImageCollection = ee.ImageCollection(S2_cloud_mask_export)
+
+#         S2_with_LST = S2_ImageCollection.map(add_landsat_lst_et)
+#         results_fc_lst = S2_with_LST.map(compute_all_metrics_LST_ET)       
+
+#         results_fcc_lst = ee.FeatureCollection(results_fc_lst)       
+
+#         ## Practice
+#         df_lst = geemap.ee_to_df(results_fcc_lst)
+#         st.success("Dataframe with NDVI, NDWI, LST, and ET generated!")
+
+#         # 4) Convert columns to numeric
+#         df_lst['Image_month'] = pd.to_numeric(df_lst['Image_month'])
+#         df_lst['Image_year'] = pd.to_numeric(df_lst['Image_year'])
+#         df_lst['LST'] = pd.to_numeric(df_lst['LST'])
+#         df_lst['ET'] = pd.to_numeric(df_lst['ET'])  # <--- NEW: Ensure ET is numeric
+
+#         # 5) Set up your plotting style
+#         sns.set(style="whitegrid", palette="muted")
+#         plt.figure(figsize=(12, 18), facecolor='none', edgecolor='none')
+
+#         # 6) Sort the DataFrame by year, then month
+#         df_lst = df_lst.sort_values(by=['Image_year', 'Image_month'])
+
+#         ############################################
+#         # 1) Plot NDVI
+#         ############################################
+#         plt.subplot(4, 1, 1)
+#         sns.lineplot(
+#             data=df_lst, 
+#             x="Image_month", 
+#             y="NDVI", 
+#             hue="Dam_status", 
+#             style="Dam_status",
+#             markers=True, 
+#             dashes=False
+#         )
+#         plt.title('NDVI by Month for Positive and Negative Sites', fontsize=14, color='white')
+#         plt.xlabel('Month', fontsize=12, color='white')
+#         plt.ylabel('Mean NDVI', fontsize=12, color='white')
+#         plt.legend(title='Dam Status', loc='upper right')
+#         plt.xticks(range(1, 13), color='white') 
+#         plt.yticks(color='white') 
+
+#         ############################################
+#         # 2) Plot NDWI_Green
+#         ############################################
+#         plt.subplot(4, 1, 2)
+#         sns.lineplot(
+#             data=df_lst, 
+#             x="Image_month", 
+#             y="NDWI_Green", 
+#             hue="Dam_status", 
+#             style="Dam_status",
+#             markers=True, 
+#             dashes=False
+#         )
+#         plt.title('NDWI Green by Month for Positive and Negative Sites', fontsize=14, color='white')
+#         plt.xlabel('Month', fontsize=12, color='white')
+#         plt.ylabel('Mean NDWI Green', fontsize=12, color='white')
+#         plt.legend(title='Dam Status', loc='upper right')
+#         plt.xticks(range(1, 13), color='white')  
+#         plt.yticks(color='white') 
+
+#         ############################################
+#         # 3) Plot LST
+#         ############################################
+#         plt.subplot(4, 1, 3)
+#         sns.lineplot(
+#             data=df_lst,
+#             x="Image_month",
+#             y="LST",
+#             hue="Dam_status",
+#             style="Dam_status",
+#             markers=True,
+#             dashes=False
+#         )
+#         plt.title('LST by Month for Positive and Negative Sites', fontsize=14, color='white')
+#         plt.xlabel('Month', fontsize=12, color='white')
+#         plt.ylabel('Mean LST (°C)', fontsize=12, color='white')
+#         plt.legend(title='Dam Status', loc='upper right')
+#         plt.xticks(range(1, 13), color='white')  
+#         plt.yticks(color='white') 
+
+#         ############################################
+#         # 4) Plot ET
+#         ############################################
+#         plt.subplot(4, 1, 4)
+#         sns.lineplot(
+#             data=df_lst,
+#             x="Image_month",
+#             y="ET",
+#             hue="Dam_status",
+#             style="Dam_status",
+#             markers=True,
+#             dashes=False
+#         )
+#         plt.title('ET by Month for Positive and Negative Sites', fontsize=14, color='white')
+#         plt.xlabel('Month', fontsize=12, color='white')
+#         plt.ylabel('Mean ET', fontsize=12, color='white')
+#         plt.legend(title='Dam Status', loc='upper right')
+#         plt.xticks(range(1, 13), color='white')  
+#         plt.yticks(color='white')
+
+#         # 7) Final layout adjustments and display
+#         plt.tight_layout()
+#         plt.show()
+#         st.pyplot(plt)
         
 
 
-    st.subheader("Upstream and Downstream Effects")
-    if st.button("Visualize Upstream and Downstream Effects"):
-        with st.spinner("Processing upstream/downstream... please wait."):
+    # st.subheader("Upstream and Downstream Effects")
+    # if st.button("Visualize Upstream and Downstream Effects"):
+    #     with st.spinner("Processing upstream/downstream... please wait."):
 
-            waterway_fc = st.session_state.selected_waterway  # The loaded hydro dataset
-            S2_ImageCollection_flowdir = S2_Export_for_visual_flowdir(Dam_data,waterway_fc)
-            # B) Add LST + OpenET
-            S2_with_LST_ET_flowdir = S2_ImageCollection_flowdir.map(add_landsat_lst_et)
-            # C) Compute separate up/down metrics
-            results_fc_ET = S2_with_LST_ET_flowdir.map(compute_all_metrics_up_downstream)
-            # D) Convert to DataFrame
-            results_fcc_ET = ee.FeatureCollection(results_fc_ET)
+    #         waterway_fc = st.session_state.selected_waterway  # The loaded hydro dataset
+    #         S2_ImageCollection_flowdir = S2_Export_for_visual_flowdir(Dam_data,waterway_fc)
+    #         # B) Add LST + OpenET
+    #         S2_with_LST_ET_flowdir = S2_ImageCollection_flowdir.map(add_landsat_lst_et)
+    #         # C) Compute separate up/down metrics
+    #         results_fc_ET = S2_with_LST_ET_flowdir.map(compute_all_metrics_up_downstream)
+    #         # D) Convert to DataFrame
+    #         results_fcc_ET = ee.FeatureCollection(results_fc_ET)
     
-            df_ET = geemap.ee_to_df(results_fcc_ET)
-            st.success("Upstream/Downstream dataframe generated!")
+    #         df_ET = geemap.ee_to_df(results_fcc_ET)
+    #         st.success("Upstream/Downstream dataframe generated!")
 
-            df_ET['Image_month'] = pd.to_numeric(df_ET['Image_month'], errors='coerce')
-            df_ET['Image_year']  = pd.to_numeric(df_ET['Image_year'], errors='coerce')
-            df_ET = df_ET.sort_values(by=['Image_year','Image_month']).reset_index(drop=True)
+    #         df_ET['Image_month'] = pd.to_numeric(df_ET['Image_month'], errors='coerce')
+    #         df_ET['Image_year']  = pd.to_numeric(df_ET['Image_year'], errors='coerce')
+    #         df_ET = df_ET.sort_values(by=['Image_year','Image_month']).reset_index(drop=True)
 
-            sns.set(style="whitegrid")
+    #         sns.set(style="whitegrid")
 
-            def melt_and_plot(df, metric, ax):
-                """ Helper to melt Up/Down columns and plot in a single lineplot. """
-                up_col = f"{metric}_up"
-                down_col = f"{metric}_down"
+    #         def melt_and_plot(df, metric, ax):
+    #             """ Helper to melt Up/Down columns and plot in a single lineplot. """
+    #             up_col = f"{metric}_up"
+    #             down_col = f"{metric}_down"
 
-                # Melt into long form
-                melted = df.melt(
-                    id_vars=['Image_year', 'Image_month', 'Dam_status'],
-                    value_vars=[up_col, down_col],
-                    var_name='Flow',
-                    value_name=metric
-                )
-                # Rename Flow
-                melted['Flow'] = melted['Flow'].replace({
-                    up_col: 'Upstream',
-                    down_col: 'Downstream'
-                })
+    #             # Melt into long form
+    #             melted = df.melt(
+    #                 id_vars=['Image_year', 'Image_month', 'Dam_status'],
+    #                 value_vars=[up_col, down_col],
+    #                 var_name='Flow',
+    #                 value_name=metric
+    #             )
+    #             # Rename Flow
+    #             melted['Flow'] = melted['Flow'].replace({
+    #                 up_col: 'Upstream',
+    #                 down_col: 'Downstream'
+    #             })
 
-                # Seaborn lineplot
-                sns.lineplot(
-                    data=melted,
-                    x='Image_month',
-                    y=metric,
-                    hue='Dam_status',
-                    style='Flow',
-                    markers=True,
-                    dashes=False,
-                    ax=ax
-                )
-                ax.set_title(f"{metric.upper()} by Month (Upstream vs Downstream)")
+    #             # Seaborn lineplot
+    #             sns.lineplot(
+    #                 data=melted,
+    #                 x='Image_month',
+    #                 y=metric,
+    #                 hue='Dam_status',
+    #                 style='Flow',
+    #                 markers=True,
+    #                 dashes=False,
+    #                 ax=ax
+    #             )
+    #             ax.set_title(f"{metric.upper()} by Month (Upstream vs Downstream)")
 
-            # Plot NDVI, NDWI, LST, ET in 4 subplots
-            fig, axes = plt.subplots(nrows=4, ncols=1, figsize=(10,16))
-            melt_and_plot(df_ET, 'NDVI', axes[0])
-            melt_and_plot(df_ET, 'NDWI', axes[1])
-            melt_and_plot(df_ET, 'LST', axes[2])
-            melt_and_plot(df_ET, 'ET', axes[3])
-            plt.tight_layout()
-            plt.show()
-            st.pyplot(fig)
+    #         # Plot NDVI, NDWI, LST, ET in 4 subplots
+    #         fig, axes = plt.subplots(nrows=4, ncols=1, figsize=(10,16))
+    #         melt_and_plot(df_ET, 'NDVI', axes[0])
+    #         melt_and_plot(df_ET, 'NDWI', axes[1])
+    #         melt_and_plot(df_ET, 'LST', axes[2])
+    #         melt_and_plot(df_ET, 'ET', axes[3])
+    #         plt.tight_layout()
+    #         plt.show()
+    #         st.pyplot(fig)
 
-            # Display the flow direction map
-            first = S2_ImageCollection_flowdir.first()
-            buffered_geometry = ee.Geometry(first.get('Area'))
-            point_geom = buffered_geometry.centroid()
+    #         # Display the flow direction map
+    #         first = S2_ImageCollection_flowdir.first()
+    #         buffered_geometry = ee.Geometry(first.get('Area'))
+    #         point_geom = buffered_geometry.centroid()
 
-            FlowDir = geemap.Map()
-            FlowDir.add_basemap("SATELLITE")
-            FlowDir.addLayer(first.select('upstream'), {'color': 'blue'}, 'Upstream')
-            FlowDir.addLayer(first.select('downstream'), {'color': 'red'}, 'Downstream')
-            FlowDir.addLayer(first.select('elevation'), {}, 'Elevation')
-            FlowDir.addLayer(point_geom, {}, 'Center Point')
-            FlowDir.centerObject(st.session_state['Dam_data'])
-            FlowDir.to_streamlit(width=800, height=600)
+    #         FlowDir = geemap.Map()
+    #         FlowDir.add_basemap("SATELLITE")
+    #         FlowDir.addLayer(first.select('upstream'), {'color': 'blue'}, 'Upstream')
+    #         FlowDir.addLayer(first.select('downstream'), {'color': 'red'}, 'Downstream')
+    #         FlowDir.addLayer(first.select('elevation'), {}, 'Elevation')
+    #         FlowDir.addLayer(point_geom, {}, 'Center Point')
+    #         FlowDir.centerObject(st.session_state['Dam_data'])
+    #         FlowDir.to_streamlit(width=800, height=600)
 
 # # # Ensure session state for selected datasets and workflow progression
 # if "selected_datasets" not in st.session_state:
