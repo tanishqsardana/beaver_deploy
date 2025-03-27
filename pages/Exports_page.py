@@ -508,6 +508,7 @@ if 'Visualize_trends' in st.session_state:
         # 4) Convert columns to numeric
         df_lst['Image_month'] = pd.to_numeric(df_lst['Image_month'])
         df_lst['Image_year'] = pd.to_numeric(df_lst['Image_year'])
+        df_lst['Dam_status'] = df_lst['Dam_status'].replace({'positive': 'Dam', 'negative': 'Non-dam'})
         df_lst['LST'] = pd.to_numeric(df_lst['LST'])
         df_lst['ET'] = pd.to_numeric(df_lst['ET'])  # <--- NEW: Ensure ET is numeric
 
