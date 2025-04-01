@@ -279,7 +279,7 @@ def upload_points_to_ee(file, widget_prefix=""):
                 standardized_features = list(filter(None, df.apply(standardize_feature, axis=1).tolist()))
                 feature_collection = ee.FeatureCollection(standardized_features)
 
-                st.success("CSV successfully uploaded and standardized.")
+                st.success("CSV successfully uploaded and standardized. Preview the data on the map below and click 'Next' to proceed.")
                 return feature_collection
 
         elif file.name.endswith(".geojson"):

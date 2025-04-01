@@ -88,6 +88,12 @@ if "buffers_created" not in st.session_state:
     st.session_state.buffers_created = False
 if "Merged_collection" not in st.session_state:
     st.session_state.Merged_collection = None
+if "visualization_complete" not in st.session_state:
+    st.session_state.visualization_complete = False
+if "df_lst" not in st.session_state:
+    st.session_state.df_lst = None
+if "fig" not in st.session_state:
+    st.session_state.fig = None
 
 
 
@@ -129,7 +135,6 @@ elif st.session_state['current_step'] == 2:
         st.session_state.dataset_loaded = False  # Track if a waterway dataset is loaded
 
     if 'Full_positive' in st.session_state:
-        st.header("Select Waterway")
         upload_own_checkbox = st.checkbox("Upload Own Dataset")
         choose_existing_checkbox = st.checkbox("Choose an Existing Dataset")
 
@@ -203,7 +208,7 @@ elif st.session_state['current_step'] == 2:
                             st.session_state.selected_waterway = merged_nhd
                             st.session_state['Waterway'] = st.session_state.selected_waterway
                             st.session_state.dataset_loaded = True
-                            st.success("NHD datasets for selected states loaded and added to the map.")
+                            st.success("NHD datasets for selected states loaded and added to the map. Click 'Next' to proceed.")
                         else:
                             st.error("No NHD datasets found for the selected states.")
                 except Exception as e:
@@ -266,6 +271,14 @@ elif st.session_state['current_step'] == 3:
                                 st.session_state['Waterway']
                             )
                             
+                            # Add debug information
+                            # st.write("Debug: Validation Results")
+                            # st.write(f"Total dams: {st.session_state['Full_positive'].size().getInfo()}")
+                            # st.write(f"Distance valid dams: {distance_validation['valid_count'].getInfo()}")
+                            # st.write(f"Distance invalid dams: {distance_validation['invalid_count'].getInfo()}")
+                            # st.write(f"Intersecting dams: {intersection_validation['intersecting_count'].getInfo()}")
+                            # st.write(f"Using max_distance: {max_distance} meters")
+                            
                             # Combine validation results
                             validation_results = {
                                 'valid_dams': distance_validation['valid_dams'],
@@ -295,6 +308,11 @@ elif st.session_state['current_step'] == 3:
                             
                     except Exception as e:
                         st.error(f"Error during validation: {str(e)}")
+                        st.write("Debug information:")
+                        st.write(f"Data size: {st.session_state['Full_positive'].size().getInfo()}")
+                        st.write(f"Data type: {type(st.session_state['Full_positive'])}")
+                        st.write(f"Waterway data size: {st.session_state['Waterway'].size().getInfo()}")
+                        st.write(f"Waterway data type: {type(st.session_state['Waterway'])}")
         
         # Show options after validation is complete
         if st.session_state['validation_step'] == 'show_options':
@@ -308,8 +326,7 @@ elif st.session_state['current_step'] == 3:
                     st.write("Please check your dam locations and waterway data.")
                     st.stop()
                 elif invalid_count > 0:
-                    st.warning("Some dam locations have been identified as potentially invalid.")
-                    st.write("Please review the validation report and map above.")
+                    st.warning("Some dam locations have been identified as potentially invalid. Please review the validation report and map above. You can continue with all dams or only use the valid dams.")
                     
                     col1, col2 = st.columns(2)
                     with col1:
@@ -427,7 +444,7 @@ elif st.session_state['current_step'] == 4:
                         st.stop()
                         
                     hydroRaster = prepareHydro(waterway_fc)
-                    
+                
                     # Generate negative points
                     negativePoints = sampleNegativePoints(
                         positive_dams_fc, 
@@ -496,7 +513,7 @@ elif st.session_state['current_step'] == 4:
                     Negative_points.addLayer(Positive_dam_id,{'color': 'blue'},'Positive')
                     Negative_points.centerObject(Merged_collection)
                     Negative_points.to_streamlit(width=1200, height=700)
-                    
+            
                     # Set completion status
                     st.session_state['step4_complete'] = True
                     st.success("Negative points generated successfully! Click 'Next' to proceed to buffering.")
@@ -562,7 +579,7 @@ elif st.session_state['current_step'] == 5:
                 
                 # Select relevant properties
                 Dam_data = Buffered_collection.select(['id_property', 'Dam', 'Survey_Date', 'Damdate', 'Point_geo'])
-                
+
                 # Save to session state
                 st.session_state['Dam_data'] = Dam_data
                 st.session_state['buffers_created'] = True
@@ -570,7 +587,7 @@ elif st.session_state['current_step'] == 5:
                 # Split into positive and negative points
                 Negative = Dam_data.filter(ee.Filter.eq('Dam', 'negative'))
                 Positive = Dam_data.filter(ee.Filter.eq('Dam', 'positive'))
-                
+
                 # Display buffer preview
                 st.subheader("Buffer Preview")
                 Buffer_map = geemap.Map()
@@ -582,7 +599,7 @@ elif st.session_state['current_step'] == 5:
                 
                 # Set completion status
                 st.session_state['step5_complete'] = True
-                st.success(f"Buffers created successfully with radius {buffer_radius} meters!")
+                st.success(f"Buffers created successfully with radius {buffer_radius} meters! Click 'Next' to proceed to visualization.")
                 
             except Exception as e:
                 st.error(f"Error creating buffers: {str(e)}")
@@ -596,136 +613,217 @@ elif st.session_state['current_step'] == 6:
         st.session_state['current_step'] = 5
         st.rerun()
     
-    if st.button("Generate Visualization"):
-        with st.spinner("Processing visualization... This may take some time."):
-            try:
-                # Filter Imagery
-                Dam_data = st.session_state['Dam_data']
+    if not st.session_state.visualization_complete:
+        if st.button("Generate Visualization"):
+            with st.spinner("Processing visualization... This may take some time."):
+                try:
+                    # Filter Imagery
+                    Dam_data = st.session_state['Dam_data']
 
-                S2_cloud_mask_export = ee.ImageCollection(S2_Export_for_visual(Dam_data))
-                S2_ImageCollection = ee.ImageCollection(S2_cloud_mask_export)
+                    S2_cloud_mask_export = ee.ImageCollection(S2_Export_for_visual(Dam_data))
+                    S2_ImageCollection = ee.ImageCollection(S2_cloud_mask_export)
 
-                S2_with_LST = S2_ImageCollection.map(add_landsat_lst_et)
-                results_fc_lst = S2_with_LST.map(compute_all_metrics_LST_ET)       
+                    S2_with_LST = S2_ImageCollection.map(add_landsat_lst_et)
+                    results_fc_lst = S2_with_LST.map(compute_all_metrics_LST_ET)       
 
-                results_fcc_lst = ee.FeatureCollection(results_fc_lst)       
+                    results_fcc_lst = ee.FeatureCollection(results_fc_lst)       
 
-                # Create DataFrame
-                df_lst = geemap.ee_to_df(results_fcc_lst)
-                st.success("Dataframe with NDVI, NDWI, LST, and ET generated!")
+                    # Create DataFrame
+                    df_lst = geemap.ee_to_df(results_fcc_lst)
+                    st.success("Dataframe with NDVI, NDWI, LST, and ET generated!")
 
-                # Convert columns to numeric
-                df_lst['Image_month'] = pd.to_numeric(df_lst['Image_month'])
-                df_lst['Image_year'] = pd.to_numeric(df_lst['Image_year'])
-                df_lst['Dam_status'] = df_lst['Dam_status'].replace({'positive': 'Dam', 'negative': 'Non-dam'})
-                df_lst['LST'] = pd.to_numeric(df_lst['LST'])
-                df_lst['ET'] = pd.to_numeric(df_lst['ET'])
+                    # Convert columns to numeric
+                    df_lst['Image_month'] = pd.to_numeric(df_lst['Image_month'])
+                    df_lst['Image_year'] = pd.to_numeric(df_lst['Image_year'])
+                    df_lst['Dam_status'] = df_lst['Dam_status'].replace({'positive': 'Dam', 'negative': 'Non-dam'})
+                    df_lst['LST'] = pd.to_numeric(df_lst['LST'])
+                    df_lst['ET'] = pd.to_numeric(df_lst['ET'])
 
-                # Set up plotting style
-                sns.set(style="whitegrid", palette="muted")
-                fig = plt.figure(figsize=(12, 18), facecolor='white', edgecolor='white')
+                    # Set up plotting style
+                    sns.set(style="whitegrid", palette="muted")
+                    fig = plt.figure(figsize=(12, 18), facecolor='white', edgecolor='white')
 
-                # Sort DataFrame
-                df_lst = df_lst.sort_values(by=['Image_year', 'Image_month'])
+                    # Sort DataFrame
+                    df_lst = df_lst.sort_values(by=['Image_year', 'Image_month'])
 
-                # Plot NDVI
-                ax1 = fig.add_subplot(4, 1, 1)
-                sns.lineplot(
-                    data=df_lst, 
-                    x="Image_month", 
-                    y="NDVI", 
-                    hue="Dam_status", 
-                    style="Dam_status",
-                    markers=True, 
-                    dashes=False,
-                    ax=ax1
-                )
-                ax1.set_title('NDVI by Month for Dam and Non-Dam Sites', fontsize=14, color='black')
-                ax1.set_xlabel('Month', fontsize=12, color='black')
-                ax1.set_ylabel('Mean NDVI', fontsize=12, color='black')
-                ax1.legend(title='Dam Status', loc='upper right')
-                ax1.set_xticks(range(1, 13))
-                ax1.tick_params(axis='x', colors='black')
-                ax1.tick_params(axis='y', colors='black')
+                    # Plot NDVI
+                    ax1 = fig.add_subplot(4, 1, 1)
+                    sns.lineplot(
+                        data=df_lst, 
+                        x="Image_month", 
+                        y="NDVI", 
+                        hue="Dam_status", 
+                        style="Dam_status",
+                        markers=True, 
+                        dashes=False,
+                        ax=ax1
+                    )
+                    ax1.set_title('NDVI by Month for Dam and Non-Dam Sites', fontsize=14, color='black')
+                    ax1.set_xlabel('Month', fontsize=12, color='black')
+                    ax1.set_ylabel('Mean NDVI', fontsize=12, color='black')
+                    ax1.legend(title='Dam Status', loc='upper right')
+                    ax1.set_xticks(range(1, 13))
+                    ax1.tick_params(axis='x', colors='black')
+                    ax1.tick_params(axis='y', colors='black')
 
-                # Plot NDWI_Green
-                ax2 = fig.add_subplot(4, 1, 2)
-                sns.lineplot(
-                    data=df_lst, 
-                    x="Image_month", 
-                    y="NDWI_Green", 
-                    hue="Dam_status", 
-                    style="Dam_status",
-                    markers=True, 
-                    dashes=False,
-                    ax=ax2
-                )
-                ax2.set_title('NDWI Green by Month for Dam and Non-Dam Sites', fontsize=14, color='black')
-                ax2.set_xlabel('Month', fontsize=12, color='black')
-                ax2.set_ylabel('Mean NDWI Green', fontsize=12, color='black')
-                ax2.legend(title='Dam Status', loc='upper right')
-                ax2.set_xticks(range(1, 13))
-                ax2.tick_params(axis='x', colors='black')
-                ax2.tick_params(axis='y', colors='black')
+                    # Plot NDWI_Green
+                    ax2 = fig.add_subplot(4, 1, 2)
+                    sns.lineplot(
+                        data=df_lst, 
+                        x="Image_month", 
+                        y="NDWI_Green", 
+                        hue="Dam_status", 
+                        style="Dam_status",
+                        markers=True, 
+                        dashes=False,
+                        ax=ax2
+                    )
+                    ax2.set_title('NDWI Green by Month for Dam and Non-Dam Sites', fontsize=14, color='black')
+                    ax2.set_xlabel('Month', fontsize=12, color='black')
+                    ax2.set_ylabel('Mean NDWI Green', fontsize=12, color='black')
+                    ax2.legend(title='Dam Status', loc='upper right')
+                    ax2.set_xticks(range(1, 13))
+                    ax2.tick_params(axis='x', colors='black')
+                    ax2.tick_params(axis='y', colors='black')
 
-                # Plot LST
-                ax3 = fig.add_subplot(4, 1, 3)
-                sns.lineplot(
-                    data=df_lst,
-                    x="Image_month",
-                    y="LST",
-                    hue="Dam_status",
-                    style="Dam_status",
-                    markers=True,
-                    dashes=False,
-                    ax=ax3
-                )
-                ax3.set_title('LST by Month for Dam and Non-Dam Sites', fontsize=14, color='black')
-                ax3.set_xlabel('Month', fontsize=12, color='black')
-                ax3.set_ylabel('Mean LST (°C)', fontsize=12, color='black')
-                ax3.legend(title='Dam Status', loc='upper right')
-                ax3.set_xticks(range(1, 13))
-                ax3.tick_params(axis='x', colors='black')
-                ax3.tick_params(axis='y', colors='black')
+                    # Plot LST
+                    ax3 = fig.add_subplot(4, 1, 3)
+                    sns.lineplot(
+                        data=df_lst,
+                        x="Image_month",
+                        y="LST",
+                        hue="Dam_status",
+                        style="Dam_status",
+                        markers=True,
+                        dashes=False,
+                        ax=ax3
+                    )
+                    ax3.set_title('LST by Month for Dam and Non-Dam Sites', fontsize=14, color='black')
+                    ax3.set_xlabel('Month', fontsize=12, color='black')
+                    ax3.set_ylabel('Mean LST (°C)', fontsize=12, color='black')
+                    ax3.legend(title='Dam Status', loc='upper right')
+                    ax3.set_xticks(range(1, 13))
+                    ax3.tick_params(axis='x', colors='black')
+                    ax3.tick_params(axis='y', colors='black')
 
-                # Plot ET
-                ax4 = fig.add_subplot(4, 1, 4)
-                sns.lineplot(
-                    data=df_lst,
-                    x="Image_month",
-                    y="ET",
-                    hue="Dam_status",
-                    style="Dam_status",
-                    markers=True,
-                    dashes=False,
-                    ax=ax4
-                )
-                ax4.set_title('ET by Month for Dam and Non-Dam Sites', fontsize=14, color='black')
-                ax4.set_xlabel('Month', fontsize=12, color='black')
-                ax4.set_ylabel('Mean ET', fontsize=12, color='black')
-                ax4.legend(title='Dam Status', loc='upper right')
-                ax4.set_xticks(range(1, 13))
-                ax4.tick_params(axis='x', colors='black')
-                ax4.tick_params(axis='y', colors='black')
+                    # Plot ET
+                    ax4 = fig.add_subplot(4, 1, 4)
+                    sns.lineplot(
+                        data=df_lst,
+                        x="Image_month",
+                        y="ET",
+                        hue="Dam_status",
+                        style="Dam_status",
+                        markers=True,
+                        dashes=False,
+                        ax=ax4
+                    )
+                    ax4.set_title('ET by Month for Dam and Non-Dam Sites', fontsize=14, color='black')
+                    ax4.set_xlabel('Month', fontsize=12, color='black')
+                    ax4.set_ylabel('Mean ET', fontsize=12, color='black')
+                    ax4.legend(title='Dam Status', loc='upper right')
+                    ax4.set_xticks(range(1, 13))
+                    ax4.tick_params(axis='x', colors='black')
+                    ax4.tick_params(axis='y', colors='black')
 
-                # Final layout adjustments and display
-                fig.tight_layout()
-                st.pyplot(fig)
-
-                # Provide download button
-                buf = io.BytesIO()
-                fig.savefig(buf, format="png", facecolor=fig.get_facecolor())
-                buf.seek(0)
+                    # Final layout adjustments
+                    fig.tight_layout()
+                    
+                    # Save to session state
+                    st.session_state.df_lst = df_lst
+                    st.session_state.fig = fig
+                    st.session_state.visualization_complete = True
+                    
+                    # Display the figure
+                    st.pyplot(fig)
+                    
+                except Exception as e:
+                    st.error(f"Error during visualization: {str(e)}")
+    
+    if st.session_state.visualization_complete:
+        # Create download section
+        st.subheader("Download Results")
+        
+        # Create two columns for download buttons
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Download figure button
+            buf = io.BytesIO()
+            st.session_state.fig.savefig(buf, format="png", facecolor=st.session_state.fig.get_facecolor())
+            buf.seek(0)
+            st.download_button(
+                label="Download Visualization",
+                data=buf,
+                file_name="trends_figure.png",
+                mime="image/png"
+            )
+        
+        with col2:
+            # Data format selection
+            data_format = st.selectbox(
+                "Select data format:",
+                ["CSV", "JSON", "TXT", "Excel (xlsx)", "Markdown (md)"]
+            )
+            
+            if data_format == "CSV":
+                csv_buf = io.StringIO()
+                st.session_state.df_lst.to_csv(csv_buf, index=False)
+                csv_buf.seek(0)
                 st.download_button(
-                    label="Download Figure",
-                    data=buf,
-                    file_name="trends_figure.png",
-                    mime="image/png"
+                    label="Download Data (CSV)",
+                    data=csv_buf.getvalue(),
+                    file_name="trends_data.csv",
+                    mime="text/csv"
                 )
-                
-                st.success("Visualization completed successfully!")
-            except Exception as e:
-                st.error(f"Error during visualization: {str(e)}")
+            
+            elif data_format == "JSON":
+                json_buf = io.StringIO()
+                st.session_state.df_lst.to_json(json_buf, orient='records', indent=2)
+                json_buf.seek(0)
+                st.download_button(
+                    label="Download Data (JSON)",
+                    data=json_buf.getvalue(),
+                    file_name="trends_data.json",
+                    mime="application/json"
+                )
+            
+            elif data_format == "TXT":
+                txt_buf = io.StringIO()
+                st.session_state.df_lst.to_string(txt_buf, index=False)
+                txt_buf.seek(0)
+                st.download_button(
+                    label="Download Data (TXT)",
+                    data=txt_buf.getvalue(),
+                    file_name="trends_data.txt",
+                    mime="text/plain"
+                )
+            
+            elif data_format == "Excel (xlsx)":
+                excel_buf = io.BytesIO()
+                with pd.ExcelWriter(excel_buf, engine='xlsxwriter') as writer:
+                    st.session_state.df_lst.to_excel(writer, index=False, sheet_name='Trends Data')
+                excel_buf.seek(0)
+                st.download_button(
+                    label="Download Data (Excel)",
+                    data=excel_buf.getvalue(),
+                    file_name="trends_data.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+            
+            elif data_format == "Markdown (md)":
+                md_buf = io.StringIO()
+                md_buf.write("# Trends Data\n\n")
+                md_buf.write(st.session_state.df_lst.to_markdown(index=False))
+                md_buf.seek(0)
+                st.download_button(
+                    label="Download Data (Markdown)",
+                    data=md_buf.getvalue(),
+                    file_name="trends_data.md",
+                    mime="text/markdown"
+                )
+        
+        st.success("Visualization completed! You can download the visualization or data in your preferred format.")
 
 # Add navigation buttons at the bottom of each step
 st.markdown("---")  # Add a horizontal line to separate content from navigation
