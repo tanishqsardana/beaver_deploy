@@ -827,14 +827,19 @@ elif st.session_state['current_step'] == 6:
 
 # Add navigation buttons at the bottom of each step
 st.markdown("---")  # Add a horizontal line to separate content from navigation
-col1, col2, col3 = st.columns([1, 2, 1])
+
+# Create a centered container for navigation buttons
+col1, col2, col3 = st.columns([1, 1, 1])
+
 with col1:
     if st.session_state['current_step'] > 1:
         if st.button("Previous"):
             st.session_state['current_step'] -= 1
             st.rerun()
+
 with col2:
-    st.markdown(f"### Step {st.session_state['current_step']}/{st.session_state['total_steps']}")
+    st.markdown(f"**Step {st.session_state['current_step']}/{st.session_state['total_steps']}**")
+
 with col3:
     if st.session_state['current_step'] < st.session_state['total_steps']:
         if st.button("Next"):
