@@ -51,17 +51,16 @@ def sampleNegativePoints(positiveDams, hydroRaster, innerRadius, outerRadius, sa
       4) Sampling from hydroRaster within that ring, ensuring hydro_mask == 1.
     """
     
-    # Buffer each point by innerRadius
-    innerBuffers = positiveDams.map(lambda pt: pt.buffer(innerRadius))
-    innerDissolved = innerBuffers.geometry().dissolve()
+    # Buffer each point by innerRadius with error margin
+    innerBuffers = positiveDams.map(lambda pt: pt.buffer(innerRadius, 1))  # 添加1米的误差范围
+    innerDissolved = innerBuffers.geometry().dissolve(1)  # 添加1米的误差范围
     
-    # Buffer the dissolved geometry by outerRadius
-    outerBuffer = ee.Feature(innerDissolved.buffer(outerRadius))
+    # Buffer the dissolved geometry by outerRadius with error margin
+    outerBuffer = ee.Feature(innerDissolved.buffer(outerRadius, 1))  # 添加1米的误差范围
     # We want just the ring (outer minus inner)
-    ringArea = outerBuffer.geometry().difference(innerDissolved)
+    ringArea = outerBuffer.geometry().difference(innerDissolved, 1)  # 添加1米的误差范围
     
     # Clip hydroRaster to that ring
-    # (Although not strictly necessary if we use region=ringArea)
     clippedHydro = hydroRaster.clip(ringArea)
     
     # Sample the same number of negatives as positives
