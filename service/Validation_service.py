@@ -153,7 +153,7 @@ def generate_validation_report(validation_results: Dict) -> str:
                 for i, feature in enumerate(invalid_dams_info['features'], 1):
                     props = feature['properties']
                     coords = props['coordinates']
-                    report.append(f"- Point #{i}, Distance: {props['distance']:.2f}m, Location: [{coords[0]:.6f}, {coords[1]:.6f}]")
+                    report.append(f"- Point #{i}, Location: [{coords[0]:.6f}, {coords[1]:.6f}]")
         
         return "\n".join(report)
     except Exception as e:
@@ -190,7 +190,7 @@ def visualize_validation_results(dam_collection: ee.FeatureCollection,
                 {"color": "green", "pointSize": 5},
                 "Valid Dams"
             )
-            st.write(f"Debug: Valid dams count: {valid_dams.size().getInfo()}")
+            # st.write(f"Debug: Valid dams count: {valid_dams.size().getInfo()}")
         
         # Add invalid dams in red
         if 'invalid_dams' in validation_results:
@@ -200,7 +200,7 @@ def visualize_validation_results(dam_collection: ee.FeatureCollection,
                 {"color": "red", "pointSize": 5},
                 "Invalid Dams"
             )
-            st.write(f"Debug: Invalid dams count: {invalid_dams.size().getInfo()}")
+            # st.write(f"Debug: Invalid dams count: {invalid_dams.size().getInfo()}")
         
         # Center the map on the dam collection
         map_obj.centerObject(dam_collection)
