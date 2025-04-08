@@ -130,6 +130,8 @@ if st.session_state.questionnaire_shown:
     if st.session_state['current_step'] == 1:
         st.warning("Please note that the Evapotranspiration data is not available for beaver dam locations in the east half of US. See which states are not available on OpenET website: [Link](https://explore.etdata.org/#5/39.665/-110.396).")
         st.header("Step 1: Upload Dam Locations")
+        if "step1_complete" not in st.session_state:
+            st.session_state["step1_complete"] = False
         uploaded_file = st.file_uploader("Choose a CSV or GeoJSON file", type=["csv", "geojson"], key="Dam_file_uploader")
         if uploaded_file:
             with st.spinner("Processing uploaded file..."):
@@ -138,8 +140,11 @@ if st.session_state.questionnaire_shown:
                     if feature_collection:
                         st.session_state.Positive_collection = feature_collection
                         st.session_state.Full_positive = feature_collection
+                        st.session_state["step1_complete"] = True
+                        
                         # Display data preview
                         st.subheader("Data Preview")
+                        st.text("Points may take a few seconds to upload")
                         preview_map = geemap.Map()
                         preview_map.add_basemap("SATELLITE")
                         preview_map.addLayer(feature_collection, {'color': 'blue'}, 'Dam Locations')
@@ -150,6 +155,8 @@ if st.session_state.questionnaire_shown:
 
     elif st.session_state['current_step'] == 2:
         st.header("Step 2: Select Waterway")
+        if "step2_complete" not in st.session_state:
+            st.session_state["step2_complete"] = False
         if "selected_waterway" not in st.session_state:
             st.session_state.selected_waterway = None
         if "dataset_loaded" not in st.session_state:
@@ -202,7 +209,8 @@ if st.session_state.questionnaire_shown:
                         st.session_state.selected_waterway = merged_nhd
                         st.session_state['Waterway'] = st.session_state.selected_waterway
                         st.session_state.dataset_loaded = True
-                        
+                        st.session_state["step2_complete"] = True
+
                         # Display map
                         Waterway_map = geemap.Map()
                         Waterway_map.add_basemap("SATELLITE")
@@ -223,6 +231,7 @@ if st.session_state.questionnaire_shown:
                             if st.button("Load Custom Dataset"):
                                 try:
                                     waterway_own = ee.FeatureCollection(asset_id)
+                                    st.session_state["step2_complete"] = True
                                     st.session_state.selected_waterway = waterway_own
                                     st.session_state.dataset_loaded = True
                                     st.success("Custom dataset successfully loaded.")
@@ -241,7 +250,7 @@ if st.session_state.questionnaire_shown:
                                         wwf_dataset = ee.FeatureCollection("WWF/HydroSHEDS/v1/FreeFlowingRivers")
                                         clipped_wwf = wwf_dataset.filterBounds(states_with_dams)
                                         st.session_state.selected_waterway = clipped_wwf
-                                        st.session_state.dataset_loaded = True
+                                        st.session_state["step2_complete"] = True
                                         st.success("WWF dataset successfully loaded.")
                                 except Exception as e:
                                     st.error(f"Failed to load dataset: {e}")
@@ -252,7 +261,8 @@ if st.session_state.questionnaire_shown:
 
     elif st.session_state['current_step'] == 3:
         st.header("Step 3: Validate Dam Locations")
-        
+        if "step3_complete" not in st.session_state:
+            st.session_state["step3_complete"] = False
         # Initialize validation state if not exists
         if 'validation_complete' not in st.session_state:
             st.session_state['validation_complete'] = False
@@ -319,7 +329,7 @@ if st.session_state.questionnaire_shown:
                                 # Store validation results in session state
                                 st.session_state['validation_results'] = validation_results
                                 st.session_state['validation_step'] = 'show_options'
-                                
+                                st.session_state["step3_complete"] = True
                                 # Display validation report
                                 st.subheader("Validation Report")
                                 st.text(generate_validation_report(validation_results))
@@ -407,7 +417,8 @@ if st.session_state.questionnaire_shown:
             st.info("Using all dam locations for analysis")
         else:
             st.info("Using only valid dam locations for analysis")
-        
+        if "step4_complete" not in st.session_state:
+            st.session_state["step4_complete"] = False
         upload_negatives_checkbox = st.checkbox("Upload Non-Dam Dataset (must be on a waterbody)")
         generate_negatives_checkbox = st.checkbox("Generate Non-Dam Locations")
 
@@ -420,6 +431,7 @@ if st.session_state.questionnaire_shown:
                         if negative_feature_collection:
                             st.session_state.Negative_upload_collection = negative_feature_collection
                             st.session_state['Full_negative'] = st.session_state.Negative_upload_collection
+                            st.session_state["step4_complete"] = True
                             st.success("Non-dam locations uploaded successfully!")
                             # Display data preview
                             st.subheader("Data Preview")
@@ -433,7 +445,7 @@ if st.session_state.questionnaire_shown:
 
         if generate_negatives_checkbox:
             st.subheader("Specify the parameters for negative point generation:")
-
+            st.image("assets/Negative_sampling_image.png")
             innerRadius = st.number_input("Inner Radius (meters)", value=200, min_value=0, step=50, key="inner_radius_input")
             outerRadius = st.number_input("Outer Radius (meters)", value=350, min_value=0, step=100, key="outer_radius_input")
             # samplingScale = st.number_input("Sampling Scale (meters)", value=10, min_value=1, step=1, key="sampling_scale_input")
@@ -533,7 +545,7 @@ if st.session_state.questionnaire_shown:
                         Merged_collection = Positive_dam_id.merge(Neg_points_id)
                         st.session_state['Merged_collection'] = Merged_collection
                         st.session_state['buffer_complete'] = True
-
+                        st.session_state["step4_complete"] = True
                         # Create and display the map
                         Negative_points = geemap.Map()
                         Negative_points.add_basemap("SATELLITE")
@@ -550,7 +562,9 @@ if st.session_state.questionnaire_shown:
 
     elif st.session_state['current_step'] == 5:
         st.header("Step 5: Create Buffers")
-        
+        if "step5_complete" not in st.session_state:
+            st.session_state["step5_complete"] = False
+
         # Check if step 4 is completed
         if not st.session_state.get('step4_complete', False):
             st.error("Please complete Step 4 first.")
@@ -627,249 +641,151 @@ if st.session_state.questionnaire_shown:
                     
                     # Set completion status
                     st.session_state['step5_complete'] = True
+                    
                     st.success(f"Buffers created successfully with radius {buffer_radius} meters! Click 'Next' to proceed to visualization.")
                     
                 except Exception as e:
                     st.error(f"Error creating buffers: {str(e)}")
-
     elif st.session_state['current_step'] == 6:
         st.header("Step 6: Visualize Trends")
-        
-        # Check if step 5 is completed
+
         if not st.session_state.get('step5_complete', False):
             st.error("Please complete Step 5 first.")
             st.session_state['current_step'] = 5
             st.rerun()
-        
-        if not st.session_state.visualization_complete:
-            if st.button("Generate Visualization"):
-                with st.spinner("Processing visualization... This may take some time."):
-                    try:
-                        # Filter Imagery
-                        Dam_data = st.session_state['Dam_data']
 
-                        S2_cloud_mask_export = ee.ImageCollection(S2_Export_for_visual(Dam_data))
-                        S2_ImageCollection = ee.ImageCollection(S2_cloud_mask_export)
+        if "visualization_complete" not in st.session_state:
+            st.session_state.visualization_complete = False
 
-                        S2_with_LST = S2_ImageCollection.map(add_landsat_lst_et)
-                        results_fc_lst = S2_with_LST.map(compute_all_metrics_LST_ET)       
+        if st.button("Generate Visualization"):
+            with st.spinner("Processing visualization..."):
+                try:
+                    Dam_data = st.session_state['Dam_data']
 
-                        results_fcc_lst = ee.FeatureCollection(results_fc_lst)       
+                    S2_cloud_mask_export = ee.ImageCollection(S2_Export_for_visual(Dam_data))
+                    S2_ImageCollection = ee.ImageCollection(S2_cloud_mask_export)
 
-                        # Create DataFrame
-                        df_lst = geemap.ee_to_df(results_fcc_lst)
-                        st.success("Dataframe with NDVI, NDWI, LST, and ET generated!")
+                    S2_with_LST = S2_ImageCollection.map(add_landsat_lst_et)
+                    results_fc_lst = S2_with_LST.map(compute_all_metrics_LST_ET)
+                    results_fcc_lst = ee.FeatureCollection(results_fc_lst)
 
-                        # Convert columns to numeric
-                        df_lst['Image_month'] = pd.to_numeric(df_lst['Image_month'])
-                        df_lst['Image_year'] = pd.to_numeric(df_lst['Image_year'])
-                        df_lst['Dam_status'] = df_lst['Dam_status'].replace({'positive': 'Dam', 'negative': 'Non-dam'})
-                        df_lst['LST'] = pd.to_numeric(df_lst['LST'])
-                        df_lst['ET'] = pd.to_numeric(df_lst['ET'])
+                    df_lst = geemap.ee_to_df(results_fcc_lst)
+                    df_lst['Image_month'] = pd.to_numeric(df_lst['Image_month'])
+                    df_lst['Image_year'] = pd.to_numeric(df_lst['Image_year'])
+                    df_lst['Dam_status'] = df_lst['Dam_status'].replace({'positive': 'Dam', 'negative': 'Non-dam'})
 
-                        # Set up plotting style
-                        sns.set(style="whitegrid", palette="muted")
-                        fig = plt.figure(figsize=(12, 18), facecolor='white', edgecolor='white')
+                    fig, axes = plt.subplots(4, 1, figsize=(12, 18))
 
-                        # Sort DataFrame
-                        df_lst = df_lst.sort_values(by=['Image_year', 'Image_month'])
+                    metrics = ['NDVI', 'NDWI_Green', 'LST', 'ET']
+                    titles = ['NDVI', 'NDWI Green', 'LST (°C)', 'ET']
 
-                        # Plot NDVI
-                        ax1 = fig.add_subplot(4, 1, 1)
-                        sns.lineplot(
-                            data=df_lst, 
-                            x="Image_month", 
-                            y="NDVI", 
-                            hue="Dam_status", 
-                            style="Dam_status",
-                            markers=True, 
-                            dashes=False,
-                            ax=ax1
-                        )
-                        ax1.set_title('NDVI by Month for Dam and Non-Dam Sites', fontsize=14, color='black')
-                        ax1.set_xlabel('Month', fontsize=12, color='black')
-                        ax1.set_ylabel('Mean NDVI', fontsize=12, color='black')
-                        ax1.legend(title='Dam Status', loc='upper right')
-                        ax1.set_xticks(range(1, 13))
-                        ax1.tick_params(axis='x', colors='black')
-                        ax1.tick_params(axis='y', colors='black')
+                    for ax, metric, title in zip(axes, metrics, titles):
+                        sns.lineplot(data=df_lst, x="Image_month", y=metric, hue="Dam_status", style="Dam_status",
+                                    markers=True, dashes=False, ax=ax)
+                        ax.set_title(f'{title} by Month', fontsize=14)
+                        ax.set_xticks(range(1, 13))
 
-                        # Plot NDWI_Green
-                        ax2 = fig.add_subplot(4, 1, 2)
-                        sns.lineplot(
-                            data=df_lst, 
-                            x="Image_month", 
-                            y="NDWI_Green", 
-                            hue="Dam_status", 
-                            style="Dam_status",
-                            markers=True, 
-                            dashes=False,
-                            ax=ax2
-                        )
-                        ax2.set_title('NDWI Green by Month for Dam and Non-Dam Sites', fontsize=14, color='black')
-                        ax2.set_xlabel('Month', fontsize=12, color='black')
-                        ax2.set_ylabel('Mean NDWI Green', fontsize=12, color='black')
-                        ax2.legend(title='Dam Status', loc='upper right')
-                        ax2.set_xticks(range(1, 13))
-                        ax2.tick_params(axis='x', colors='black')
-                        ax2.tick_params(axis='y', colors='black')
+                    plt.tight_layout()
+                    st.session_state.fig = fig
+                    st.session_state.df_lst = df_lst
+                    st.session_state.visualization_complete = True
 
-                        # Plot LST
-                        ax3 = fig.add_subplot(4, 1, 3)
-                        sns.lineplot(
-                            data=df_lst,
-                            x="Image_month",
-                            y="LST",
-                            hue="Dam_status",
-                            style="Dam_status",
-                            markers=True,
-                            dashes=False,
-                            ax=ax3
-                        )
-                        ax3.set_title('LST by Month for Dam and Non-Dam Sites', fontsize=14, color='black')
-                        ax3.set_xlabel('Month', fontsize=12, color='black')
-                        ax3.set_ylabel('Mean LST (°C)', fontsize=12, color='black')
-                        ax3.legend(title='Dam Status', loc='upper right')
-                        ax3.set_xticks(range(1, 13))
-                        ax3.tick_params(axis='x', colors='black')
-                        ax3.tick_params(axis='y', colors='black')
+                except Exception as e:
+                    st.error(f"Visualization error: {e}")
 
-                        # Plot ET
-                        ax4 = fig.add_subplot(4, 1, 4)
-                        sns.lineplot(
-                            data=df_lst,
-                            x="Image_month",
-                            y="ET",
-                            hue="Dam_status",
-                            style="Dam_status",
-                            markers=True,
-                            dashes=False,
-                            ax=ax4
-                        )
-                        ax4.set_title('ET by Month for Dam and Non-Dam Sites', fontsize=14, color='black')
-                        ax4.set_xlabel('Month', fontsize=12, color='black')
-                        ax4.set_ylabel('Mean ET', fontsize=12, color='black')
-                        ax4.legend(title='Dam Status', loc='upper right')
-                        ax4.set_xticks(range(1, 13))
-                        ax4.tick_params(axis='x', colors='black')
-                        ax4.tick_params(axis='y', colors='black')
-
-                        # Final layout adjustments
-                        fig.tight_layout()
-                        
-                        # Save to session state
-                        st.session_state.df_lst = df_lst
-                        st.session_state.fig = fig
-                        st.session_state.visualization_complete = True
-                        
-                        # Display the figure
-                        st.pyplot(fig)
-                        
-                    except Exception as e:
-                        st.error(f"Error during visualization: {str(e)}")
-        
         if st.session_state.visualization_complete:
-            # Create download section
-            st.subheader("Download Results")
-            
-            # Create two columns for download buttons
+            st.pyplot(st.session_state.fig)
             col1, col2 = st.columns(2)
-            
+
             with col1:
-                # Download figure button
                 buf = io.BytesIO()
-                st.session_state.fig.savefig(buf, format="png", facecolor=st.session_state.fig.get_facecolor())
+                st.session_state.fig.savefig(buf, format="png")
                 buf.seek(0)
-                st.download_button(
-                    label="Download Visualization",
-                    data=buf,
-                    file_name="trends_figure.png",
-                    mime="image/png"
-                )
-            
+                st.download_button("Download Initial Figures", buf, "initial_trends.png", "image/png")
+
             with col2:
-                # Data format selection
-                data_format = st.selectbox(
-                    "Select data format:",
-                    ["CSV", "JSON", "TXT", "Excel (xlsx)", "Markdown (md)"]
-                )
-                
-                if data_format == "CSV":
-                    csv_buf = io.StringIO()
-                    st.session_state.df_lst.to_csv(csv_buf, index=False)
-                    csv_buf.seek(0)
-                    st.download_button(
-                        label="Download Data (CSV)",
-                        data=csv_buf.getvalue(),
-                        file_name="trends_data.csv",
-                        mime="text/csv"
-                    )
-                
-                elif data_format == "JSON":
-                    json_buf = io.StringIO()
-                    st.session_state.df_lst.to_json(json_buf, orient='records', indent=2)
-                    json_buf.seek(0)
-                    st.download_button(
-                        label="Download Data (JSON)",
-                        data=json_buf.getvalue(),
-                        file_name="trends_data.json",
-                        mime="application/json"
-                    )
-                
-                elif data_format == "TXT":
-                    txt_buf = io.StringIO()
-                    st.session_state.df_lst.to_string(txt_buf, index=False)
-                    txt_buf.seek(0)
-                    st.download_button(
-                        label="Download Data (TXT)",
-                        data=txt_buf.getvalue(),
-                        file_name="trends_data.txt",
-                        mime="text/plain"
-                    )
-                
-                elif data_format == "Excel (xlsx)":
-                    excel_buf = io.BytesIO()
-                    with pd.ExcelWriter(excel_buf, engine='xlsxwriter') as writer:
-                        st.session_state.df_lst.to_excel(writer, index=False, sheet_name='Trends Data')
-                    excel_buf.seek(0)
-                    st.download_button(
-                        label="Download Data (Excel)",
-                        data=excel_buf.getvalue(),
-                        file_name="trends_data.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-                
-                elif data_format == "Markdown (md)":
-                    md_buf = io.StringIO()
-                    md_buf.write("# Trends Data\n\n")
-                    md_buf.write(st.session_state.df_lst.to_markdown(index=False))
-                    md_buf.seek(0)
-                    st.download_button(
-                        label="Download Data (Markdown)",
-                        data=md_buf.getvalue(),
-                        file_name="trends_data.md",
-                        mime="text/markdown"
-                    )
+                csv = st.session_state.df_lst.to_csv(index=False).encode('utf-8')
+                st.download_button("Download Initial Data (CSV)", csv, "initial_data.csv", "text/csv")
+
+            st.markdown("---")
+            st.subheader("Upstream & Downstream Analysis")
+
+            if st.button("Analyze Upstream & Downstream Effects"):
+                with st.spinner("Analyzing Upstream & Downstream..."):
+                    try:
+                        Dam_data = st.session_state['Dam_data']
+                        waterway_fc = st.session_state['Waterway']
+                        total_count = Dam_data.size().getInfo()
+                        batch_size = 10
+                        num_batches = (total_count + batch_size - 1) // batch_size
+                        dam_list = Dam_data.toList(total_count)
+                        df_list = []
+
+                        progress_bar = st.progress(0)
+                        for i in range(num_batches):
+                            batch = dam_list.slice(i * batch_size, min(total_count, (i + 1) * batch_size))
+                            dam_batch = ee.FeatureCollection(batch)
+
+                            S2_IC_batch = S2_Export_for_visual_flowdir(dam_batch, waterway_fc)
+                            results_batch = S2_IC_batch.map(add_landsat_lst_et).map(compute_all_metrics_up_downstream)
+                            df_batch = geemap.ee_to_df(ee.FeatureCollection(results_batch))
+                            df_list.append(df_batch)
+                            progress_bar.progress((i+1)/num_batches)
+
+                        final_df = pd.concat(df_list)
+                        st.session_state.final_df = final_df
+
+                        fig2, axes2 = plt.subplots(4, 1, figsize=(12, 20))
+
+                        def melt_and_plot(df, metric, ax):
+                            melted = df.melt(['Image_year','Image_month','Dam_status'], [f"{metric}_up", f"{metric}_down"], 'Flow', metric)
+                            melted['Flow'].replace({f"{metric}_up":'Upstream', f"{metric}_down":'Downstream'}, inplace=True)
+                            sns.lineplot(data=melted, x='Image_month', y=metric, hue='Dam_status', style='Flow', markers=True, ax=ax)
+                            ax.set_title(f"{metric.upper()} by Month (Upstream vs Downstream)")
+                            ax.set_xticks(range(1,13))
+
+                        for ax, met in zip(axes2, ['NDVI', 'NDWI', 'LST', 'ET']):
+                            melt_and_plot(final_df, met, ax)
+
+                        plt.tight_layout()
+                        st.session_state.fig2 = fig2
+
+                    except Exception as e:
+                        st.error(f"Analysis error: {e}")
+
+            if "fig2" in st.session_state:
+                st.pyplot(st.session_state.fig2)
+                buf2 = io.BytesIO()
+                st.session_state.fig2.savefig(buf2, format="png")
+                buf2.seek(0)
+                st.download_button("Download Up/Downstream Figures", buf2, "up_downstream.png", "image/png")
+
+
+                st.success("Upstream & downstream analysis completed successfully!")
+
             
-            st.success("Visualization completed! You can download the visualization or data in your preferred format.")
+            
 
     # Add navigation buttons at the bottom of each step
     st.markdown("---")  # Add a horizontal line to separate content from navigation
 
-    # Create a centered container for navigation buttons
-    col1, col2, col3 = st.columns([1, 1, 1])
+    col1, col2 = st.columns([1, 1])
 
     with col1:
-        if st.session_state['current_step'] > 1:
-            if st.button("Previous"):
-                st.session_state['current_step'] -= 1
-                st.rerun()
+        st.markdown(f"**Step {st.session_state['current_step']} of {st.session_state['total_steps']}**")
 
     with col2:
-        st.markdown(f"**Step {st.session_state['current_step']}/{st.session_state['total_steps']}**")
+        current_step_flag = f"step{st.session_state['current_step']}_complete"
 
-    with col3:
         if st.session_state['current_step'] < st.session_state['total_steps']:
-            if st.button("Next"):
-                st.session_state['current_step'] += 1
-                st.rerun()
+            if st.session_state.get(current_step_flag, False):
+                if st.button("Next →"):
+                    st.session_state['current_step'] += 1
+                    st.rerun()
+            # else:
+            #     st.info("Please complete this step before moving forward.")
+        else:
+            if st.session_state.get(current_step_flag, False):
+                st.success('Visualization complete! Please navigate to the **"Quick Analysis"** page to modify parameters.')
+            # else:
+            #     st.info("Please complete visualization first.")

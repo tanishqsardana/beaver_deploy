@@ -247,49 +247,49 @@ def S2_Export_for_visual_flowdir(Dam_Collection, filtered_waterway):
             cloud = image.get('CLOUDY_PIXEL_PERCENTAGE')
             # intersect = image.get('intersection_ratio')
             
+            ### buffered_geometry
+            # buffered_geometry = boxArea.geometry()
+            buffered_geometry = box.geometry()
+            point_geom  = buffered_geometry.centroid()
+            buffered_geometry = point_geom.buffer(200)
+            
+            waterway_state = filtered_waterway.filterBounds(buffered_geometry)
+            
             dataset = ee.Image('USGS/3DEP/10m')
             elevation_select = dataset.select('elevation')
             elevation = ee.Image(elevation_select)
-
-            # Extract sample area from elevation
-            point_geom1 = DamGeo
-            # point_geom = ee.Geometry(DamGeo)
-            # Extract elevation of dam location
-            point_elevation = ee.Number(elevation.sample(point_geom1, 10).first().get('elevation'))
-            buffered_area = boxArea
-            elevation_clipped = elevation.clip(buffered_area)
-
-            # Create elevation radius around point to sample from
+            
+            
+            # point_geom = firstFeature.geometry()
+            point_elevation = ee.Number(elevation.sample(point_geom, 10).first().get('elevation'))
+            
+            # Clip and mask based on some +/- thresholds
             point_plus = point_elevation.add(3)
-            point_minus = point_elevation.subtract(5)        
-            elevation_masked = elevation_clipped.where(elevation_clipped.lt(point_minus), 0).where(elevation_clipped.gt(point_minus), 1).where(elevation_clipped.gt(point_plus), 0)
-            elevation_masked2 = elevation_masked.updateMask(elevation_masked.eq(1));
-
-            ### buffered_geometry
-            buffered_geometry = box.geometry()
+            point_minus = point_elevation.subtract(10)        
+            elevation_clipped = elevation.clip(buffered_geometry)
             
-            ### point_geom
-            point_geom  = buffered_geometry.centroid()
+            # 1 = within range, 0 = outside range
+            elevation_masked = (elevation_clipped
+                .where(elevation_clipped.lt(point_minus), 0)
+                .where(elevation_clipped.gt(point_minus), 1)
+                .where(elevation_clipped.gt(point_plus), 0))
+
+            elevation_masked2 = elevation_masked.updateMask(elevation_masked.eq(1))
             
-
-            waterway_state = filtered_waterway
-  
-            flowdir_1 = waterway_state.filter(ee.Filter.eq('flowdir', 1))
-
-            def find_closest_flowline(point_geom, waterway =waterway_state):
- 
+            def find_closest_flowline(point_geom, waterway = filtered_waterway):
+                # Filter to flowlines within some max distance bounding box
+                # (This helps avoid dealing with massive data.)
                 candidate_fc = waterway.filterBounds(point_geom.buffer(100))
                 
                 # Compute distance from each flowline to the point:
-                candidate_fc_with_dist = candidate_fc.map(
-                    lambda f: f.set('dist', f.geometry().distance(point_geom))
-                )
+                candidate_fc_with_dist = candidate_fc.map(lambda f: f.set('dist', f.geometry().distance(point_geom)))
                 
                 # Sort by distance ascending and take the first feature
                 closest = ee.Feature(candidate_fc_with_dist.sort('dist').first())
                 return closest
-
-            main_flowline = find_closest_flowline(point_geom)
+            
+            
+            main_flowline = ee.Feature(find_closest_flowline(point_geom))
             main_geom = main_flowline.geometry()
             
             # Compute the distance from your point to the line (in meters, if your CRS is in meters)
@@ -299,23 +299,117 @@ def S2_Export_for_visual_flowdir(Dam_Collection, filtered_waterway):
             # (Note: if the point lies exactly on the line, distance_to_line will be 0. You might need a check for that.)
             buffer_radius = ee.Number(distance_to_line).add(1)  # or some small number in degrees
             buffered_point = point_geom.buffer(buffer_radius)
-            buffered_point_2 = point_geom.buffer(distance_to_line)
+            # buffered_point_2 = point_geom.buffer(distance_to_line)
             
             # The intersection of the line and this buffer gives the nearest point.
             closest_point_geom = main_geom.intersection(buffered_point, 1)
             
-            closest_point_geom
             coords = ee.List(closest_point_geom.coordinates())
+
+            List = coords.flatten()
             
-            # Create a point from the first coordinate
-            closest_point = ee.Geometry.Point(coords.get(0))
+            new_coord = ee.List([
+                ee.Number(List.get(0)), 
+                ee.Number(List.get(1))
+            ])
+            closest_point = ee.Geometry.Point(new_coord)
+            
+            # closest_point = ee.Geometry.Point(coords.get(0))
+            
+            p1 = ee.Geometry.Point(new_coord)
+            
+            second_coord = ee.List([
+                ee.Number(List.get(2)), 
+                ee.Number(List.get(3))
+            ])
+            
+            p2 = ee.Geometry.Point(second_coord)
+
+
+            
+            # Create the first linestring between p1 and p2
+            line1 = ee.Geometry.LineString([p1.coordinates(), p2.coordinates()])
+            
+            # Cast each coordinate to an ee.Number so we can do arithmetic
+            x1 = ee.Number(p1.coordinates().get(0))
+            y1 = ee.Number(p1.coordinates().get(1))
+            x2 = ee.Number(p2.coordinates().get(0))
+            y2 = ee.Number(p2.coordinates().get(1))
+            
+            # Midpoint in latitude-longitude
+            xm = x1.add(x2).divide(2)
+            ym = y1.add(y2).divide(2)
+            
+            # Vector along line1
+            dx = x2.subtract(x1)
+            dy = y2.subtract(y1)
+            
+            # To rotate (dx, dy) by 90°, pick (dy, -dx) or (-dy, dx).
+            # We'll choose (dy, -dx) here.
+            dx_perp = dy
+            dy_perp = dx.multiply(-1)
+            
+            
+            dx_half = dx_perp.divide(2)
+            dy_half = dy_perp.divide(2)
+            length_factor = 10
+            
+            # Scale the perpendicular vector
+            dx_long = dx_perp.multiply(length_factor).divide(2)  
+            dy_long = dy_perp.multiply(length_factor).divide(2)  
+            
+            # Perpendicular line endpoints
+            p3 = ee.Geometry.Point([xm.subtract(dx_long), ym.subtract(dy_long)])
+            p4 = ee.Geometry.Point([xm.add(dx_long), ym.add(dy_long)])
+            
+            # Create the perpendicular LineString
+            extended_perpendicular = ee.Geometry.LineString([p3.coordinates(), p4.coordinates()])
+            
+            buffer_distance = 130  # meters
+            buffered_poly = extended_perpendicular.buffer(buffer_distance)
+            
+            
+            bbox = buffered_poly.bounds()  # This is an ee.Geometry with a single ring
+            boundingCoords = bbox.coordinates()         # ee.List
+            boundingRing = ee.List(boundingCoords.get(0))  # ee.List of [ [west, south], [west, north], ... ]
+            
+            westSouth = ee.List(boundingRing.get(0))  # [west, south]
+            westNorth = ee.List(boundingRing.get(1))  # [west, north]
+            eastNorth = ee.List(boundingRing.get(2))  # [east, north]
+            eastSouth = ee.List(boundingRing.get(3))  # [east, south]
+            
+            west  = ee.Number(westSouth.get(0))
+            south = ee.Number(westSouth.get(1))
+            east  = ee.Number(eastNorth.get(0))
+            north = ee.Number(eastNorth.get(1))
+            
+            # Mid-latitude
+            mid_lat = south.add(north).divide(2)
+            
+            # Create top/bottom rectangles
+            top_rect = ee.Geometry.Rectangle([west, mid_lat, east, north])
+            bot_rect = ee.Geometry.Rectangle([west, south, east, mid_lat])
+            
+            # 6) Intersect rectangles with the buffer to get two halves
+            top_poly = buffered_poly.intersection(top_rect, maxError=1)
+            bot_poly = buffered_poly.intersection(bot_rect, maxError=1)
+            
+            
+            top_feature = ee.Feature(top_poly, {'id': 'top'})
+            bot_feature = ee.Feature(bot_poly, {'id': 'bot'})
+            
+            
+            # Step 2: Buffer the extended line just enough to make a thin clipping strip
+            split_strip = extended_perpendicular.buffer(1)
+            
             def get_closest_vertex_index(coords, pt):
                 distances = coords.map(lambda c: ee.Geometry.Point(c).distance(pt))
                 min_dist = distances.reduce(ee.Reducer.min())
                 return ee.List(distances).indexOf(min_dist)
             
             # Get the full list of coordinates from the flowline geometry.
-            line_coords = ee.List(main_geom.coordinates())
+            line_coords = main_geom.coordinates()
+            
             
             # Find the index of the vertex nearest to our computed closest point.
             closest_index = get_closest_vertex_index(line_coords, closest_point)
@@ -323,14 +417,133 @@ def S2_Export_for_visual_flowdir(Dam_Collection, filtered_waterway):
             upstream_coords = line_coords.slice(0, ee.Number(closest_index).add(1))
             downstream_coords = line_coords.slice(ee.Number(closest_index), line_coords.size())
             
-            # Create new LineString geometries for upstream and downstream flow.
-            upstream_line = ee.Geometry.LineString(upstream_coords)
-            downstream_line = ee.Geometry.LineString(downstream_coords)
+            #################
+
+            def ensure_two_coords(coords, main_coords, closest_idx, direction):
+                """
+                coords: The initial list of coordinates for upstream or downstream.
+                main_coords: The entire coordinate list of the flowline.
+                closest_idx: Index of the vertex nearest the point of interest.
+                direction: 'up' or 'down' – determines where we add a fallback coordinate.
+                """
+                coords_list = ee.List(coords)
+                size = coords_list.size()
+                
+                # If already >= 2, do nothing; otherwise add a neighbor from main_coords.
+                return ee.Algorithms.If(
+                    size.gte(2),
+                    coords_list,
+                    ee.Algorithms.If(
+                        direction == 'up',
+                        # Upstream fallback: add the vertex after closest_idx
+                        coords_list.cat([
+                            main_coords.get(
+                                ee.Number(closest_idx)
+                                  .add(1)
+                                  .min(main_coords.size().subtract(1))
+                            )
+                        ]),
+                        # Downstream fallback: add the vertex before closest_idx
+                        coords_list.cat([
+                            main_coords.get(
+                                ee.Number(closest_idx)
+                                  .subtract(1)
+                                  .max(0)
+                            )
+                        ])
+                    )
+                )
+            
+            # Ensure at least two coordinates for both slices.
+            upstream_coords_fixed = ensure_two_coords(upstream_coords, line_coords, closest_index, 'up')
+            downstream_coords_fixed = ensure_two_coords(downstream_coords, line_coords, closest_index, 'down')
+            
+            # Convert them to ee.List for further manipulation.
+            upstream_list = ee.List(upstream_coords_fixed)
+            downstream_list = ee.List(downstream_coords_fixed)
+            
+            # 3) Remove the shared coordinate from whichever slice is longer.
+            def remove_shared_coordinate(up_coords, down_coords):
+                up_size = up_coords.size()
+                down_size = down_coords.size()
+                
+                # If upstream is bigger, remove its last coordinate.
+                # Otherwise (or if equal), remove the first coordinate from downstream.
+                trimmed_up = ee.Algorithms.If(
+                    up_size.gt(down_size),
+                    up_coords.slice(0, up_size.subtract(1)),  # remove last from upstream
+                    up_coords
+                )
+                trimmed_down = ee.Algorithms.If(
+                    up_size.gte(down_size),
+                    down_coords,
+                    down_coords.slice(1)                     # remove first from downstream
+                )
+                return {
+                    'up': trimmed_up,
+                    'down': trimmed_down
+                }
+            
+            # Apply the removal.
+            removed_dict = remove_shared_coordinate(upstream_list, downstream_list)
+            final_up_coords = ee.List(removed_dict.get('up'))
+            final_down_coords = ee.List(removed_dict.get('down'))
+            
+            # 4) Convert to final LineString geometries.
+            upstream_line = ee.Geometry.LineString(final_up_coords)
+            downstream_line = ee.Geometry.LineString(final_down_coords)
+
+
+            ##################
+            # Define upstream and downstream lines
+            # upstream_line = ee.Geometry.LineString(upstream_coords)
+            # downstream_line = ee.Geometry.LineString(downstream_coords)
+            
+            def label_flow_basic(feature):
+                intersects_up = feature.geometry().intersects(upstream_line, ee.ErrorMargin(1))
+                intersects_down = feature.geometry().intersects(downstream_line, ee.ErrorMargin(1))
+                
+                return ee.Algorithms.If(
+                    intersects_up,
+                    # If up == True
+                    ee.Algorithms.If(
+                        intersects_down,
+                        feature.set('flow', 'both'),
+                        feature.set('flow', 'upstream')
+                    ),
+                    # else (up == False)
+                    ee.Algorithms.If(
+                        intersects_down,
+                        feature.set('flow', 'downstream'),
+                        feature.set('flow', 'unknown')
+                    )
+                )
+
+            
+            
+            halves = ee.FeatureCollection([top_feature, bot_feature])
+            
+            # Label each half with the basic rule above
+            labeled_halves = halves.map(label_flow_basic)
+            features = labeled_halves.toList(labeled_halves.size())
+            f1 = ee.Feature(features.get(0))
+            f2 = ee.Feature(features.get(1))
+            f1_flow = f1.getString('flow') ## upstream
+            f2_flow = f2.getString('flow') ## both
+            def opposite(flow_str):
+                return ee.String(ee.Algorithms.If(flow_str.equals('upstream'),'downstream', 'upstream'))
+            f1_new = ee.Feature(ee.Algorithms.If(f1_flow.equals('both'),f1.set('flow', opposite(f2_flow)),f1))
+            f2_new = ee.Feature(ee.Algorithms.If(f2_flow.equals('both'),f2.set('flow', opposite(f1_flow)),f2))
+            new_fc = ee.FeatureCollection([f1_new, f2_new])
+            
+            
+            # # Filter into two variables
+            upstream_half = new_fc.filter(ee.Filter.eq('flow', 'upstream')).geometry()
+            downstream_half = new_fc.filter(ee.Filter.eq('flow', 'downstream')).geometry()
+            
             
             # Filter out the main_flowline from the rest
-            others = flowdir_1.filter(
-                ee.Filter.neq('system:index', main_flowline.get('system:index'))
-            )
+            others = waterway_state.filter(ee.Filter.neq('system:index', main_flowline.get('system:index')))
             # 5) CLASSIFY THE OTHER FLOWLINES INTO UPSTREAM / DOWNSTREAM / UNCLASSIFIED
             def classify_flowline(feature,upstream,downstream):
                 geom = feature.geometry()
@@ -366,7 +579,7 @@ def S2_Export_for_visual_flowdir(Dam_Collection, filtered_waterway):
             upstreamWaterway = ee.FeatureCollection([ee.Feature(upstream_line)]).merge(upstream_others1)
             downstreamWaterway = ee.FeatureCollection([ee.Feature(downstream_line)]).merge(downstream_others1)
             
-            classified_rest2 = classified_rest1.map(lambda f: classify_flowline(f, upstreamWaterway, downstreamWaterway))
+            classified_rest2 = unclassified_others1.map(lambda f: classify_flowline(f, upstreamWaterway, downstreamWaterway))
             
             
             upstream_others2 = classified_rest2.filter(ee.Filter.eq('flow_part', 'upstream_flow'))
@@ -376,12 +589,11 @@ def S2_Export_for_visual_flowdir(Dam_Collection, filtered_waterway):
             upstreamWaterway2 = upstream_others2.merge(upstreamWaterway)
             downstreamWaterway2 = downstream_others2.merge(downstreamWaterway)
             
-            classified_rest3 = classified_rest2.map(lambda f: classify_flowline(f, upstreamWaterway2, downstreamWaterway2))
+            classified_rest3 = unclassified_others2.map(lambda f: classify_flowline(f, upstreamWaterway2, downstreamWaterway2))
             
             
             upstream_others3 = classified_rest3.filter(ee.Filter.eq('flow_part', 'upstream_flow'))
             downstream_others3 = classified_rest3.filter(ee.Filter.eq('flow_part', 'downstream_flow'))
-            unclassified_others3 = classified_rest3.filter(ee.Filter.eq('flow_part', 'unclassified'))
             
             upstreamWaterway3 = upstream_others3.merge(upstreamWaterway2)
             downstreamWaterway3 = downstream_others3.merge(downstreamWaterway2)
@@ -390,27 +602,36 @@ def S2_Export_for_visual_flowdir(Dam_Collection, filtered_waterway):
             # 6) DISSOLVE EACH GROUP INTO SINGLE GEOMETRIES
             upstreamGeometry = upstreamWaterway3.geometry().dissolve()
             downstreamGeometry = downstreamWaterway3.geometry().dissolve()
-
+            
             
             # 7) BUFFER & MASK ELEVATION
-            bufferDist = 50  # meters
+            bufferDist = 100  # meters
             upstreamBuffered = upstreamGeometry.buffer(bufferDist)
             downstreamBuffered = downstreamGeometry.buffer(bufferDist)
             
-            # upstreamElevation = elevation.clip(upstreamBuffered)
-            # downstreamElevation = elevation.clip(downstreamBuffered)
             
             upstream_mask_img = ee.Image.constant(1).clip(upstreamBuffered)
             downstream_mask_img = ee.Image.constant(1).clip(downstreamBuffered)
             
-            # Finally apply them to your 'elevation_masked2' image
+            
+            # Create inverse masks using downstream_half and upstream_half geometries
+            downstream_half_mask = ee.Image.constant(0).paint(downstream_half, 1)
+            upstream_half_mask = ee.Image.constant(0).paint(upstream_half, 1)
+            
+            
+            upstream_final_mask = upstream_mask_img.updateMask(downstream_half_mask.Not())
+            downstream_final_mask = downstream_mask_img.updateMask(upstream_half_mask.Not())
+            
+            # Apply the refined masks to the elevation image
             upstream_elev_mask = elevation_masked2.updateMask(
-                elevation_masked2.mask().And(upstream_mask_img)
+            elevation_masked2.mask().And(upstream_final_mask)
             )
             
             downstream_elev_mask = elevation_masked2.updateMask(
-                elevation_masked2.mask().And(downstream_mask_img)
+            elevation_masked2.mask().And(downstream_final_mask)
             )
+
+
             downstream_rename = downstream_elev_mask.rename('downstream')
             upstream_rename = upstream_elev_mask.rename('upstream')
             # Add bands, create new "id" property to name the file, and clip the images to the ROI
@@ -474,6 +695,7 @@ def S2_Export_for_visual_flowdir(Dam_Collection, filtered_waterway):
 
     ImageryCollections = Dam_Collection.map(extract_pixels).flatten()
     return ee.ImageCollection(ImageryCollections)
+
 
 
 ############# Functions to compute metrics
