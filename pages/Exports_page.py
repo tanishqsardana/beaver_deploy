@@ -66,7 +66,7 @@ if 'survey_clicked' not in st.session_state:
 if "Positive_collection" not in st.session_state:
     st.session_state.Positive_collection = None
 if "buffer_radius" not in st.session_state:
-    st.session_state.buffer_radius = 200  # Default buffer radius
+    st.session_state.buffer_radius = 150  # Default buffer radius
 if "validation_complete" not in st.session_state:
     st.session_state.validation_complete = False
 if "use_all_dams" not in st.session_state:
@@ -115,14 +115,14 @@ if not st.session_state.questionnaire_shown:
     Please click [here](https://docs.google.com/forms/d/e/1FAIpQLSeE1GP7OptA4-z8Melz2AHxNsddtL9ZgJVXdVVtxLsrljJ10Q/viewform?usp=sharing) to start the survey.
     """)
     
-    if st.button("I have started the survey and will fill it out during analysis.", type="primary"):
+    if st.button("I have opened the survey and will fill it out after trying the webtool.", type="primary"):
         st.session_state.questionnaire_shown = True
         st.rerun()
 
 # Continue with the rest of the application if questionnaire is shown
 if st.session_state.questionnaire_shown:
     st.title("Analyzing the Impact of Beaver Dams")
-    st.warning("Please note that the Evapotranspiration data is not available for beaver dam locations in the east half of US. See which states are not available on OpenET website: [Link](https://explore.etdata.org/#5/39.665/-110.396).")
+    st.warning("Please note that the Evapotranspiration data is not available for beaver dam locations in the east half of the US. See which states are not available on OpenET website: [Link](https://explore.etdata.org/#5/39.665/-110.396).")
     
     # Create expandable sections for each step
     with st.expander("Step 1: Upload Dam Locations", expanded=not st.session_state.step1_complete):
@@ -145,7 +145,6 @@ if st.session_state.questionnaire_shown:
                         preview_map.addLayer(feature_collection, {'color': 'blue'}, 'Dam Locations')
                         preview_map.centerObject(feature_collection)
                         preview_map.to_streamlit(width=800, height=600)
-                        st.success("✅ Dam locations uploaded successfully!")
                 except Exception as e:
                     st.error(f"Error processing file: {str(e)}")
 
@@ -153,7 +152,9 @@ if st.session_state.questionnaire_shown:
         st.header("Step 2: Select Waterway")
         if 'Full_positive' in st.session_state:
             # Show loading message
-            st.info("Automatically loading NHD dataset and preparing map...")
+            st.success("Automatically loaded NHD dataset. If you want to use a different dataset, you can upload your own or use the alternative dataset.")
+            
+        
             
             try:
                 # Get dam bounds
@@ -211,9 +212,9 @@ if st.session_state.questionnaire_shown:
                         Waterway_map.to_streamlit(width=1200, height=700)
                                                 
                         # Provide additional options
-                        st.subheader("Additional Options")
-                        upload_own_checkbox = st.checkbox("Use Custom Dataset")
-                        choose_other_checkbox = st.checkbox("Use Alternative Dataset")
+                        st.subheader("To use a different waterway map instead:")
+                        upload_own_checkbox = st.checkbox("Use Custom WaterwayMap")
+                        choose_other_checkbox = st.checkbox("Use Alternative Waterway Map")
 
                         if upload_own_checkbox:
                             asset_id = st.text_input("Enter GEE Asset Table ID (e.g., projects/ee-beaver-lab/assets/Hydro/MA_Hydro_arc):")
@@ -223,29 +224,29 @@ if st.session_state.questionnaire_shown:
                                     st.session_state.step2_complete = True
                                     st.session_state.selected_waterway = waterway_own
                                     st.session_state.dataset_loaded = True
-                                    st.success("✅ Custom dataset successfully loaded.")
+                                    st.success("Custom dataset successfully loaded.")
                                 except Exception as e:
                                     st.error(f"Failed to load dataset: {e}")
 
                         if choose_other_checkbox:
                             dataset_option = st.selectbox(
-                                "Select alternative dataset:",
+                                "Select alternative map:",
                                 ["WWF Free Flowing Rivers"]
                             )
 
-                            if st.button("Load Alternative Dataset"):
+                            if st.button("Load Alternative Map"):
                                 try:
                                     if dataset_option == "WWF Free Flowing Rivers":
                                         wwf_dataset = ee.FeatureCollection("WWF/HydroSHEDS/v1/FreeFlowingRivers")
                                         clipped_wwf = wwf_dataset.filterBounds(states_with_dams)
                                         st.session_state.selected_waterway = clipped_wwf
                                         st.session_state.step2_complete = True
-                                        st.success("✅ WWF dataset successfully loaded.")
+                                        st.success("WWF dataset successfully loaded.")
                                 except Exception as e:
                                     st.error(f"Failed to load dataset: {e}")
                         
                         if st.session_state.step2_complete:
-                            st.success("✅ Waterway dataset loaded successfully!")
+                            st.success("Waterway map loaded successfully.")
                     else:
                         st.error("No NHD datasets found for the selected states.")
             except Exception as e:
@@ -262,7 +263,7 @@ if st.session_state.questionnaire_shown:
             max_distance = st.number_input(
                 "Maximum allowed distance from waterway (meters):",
                 min_value=0,
-                value=100,
+                value=50,
                 step=10,
                 key="max_distance_input"
             )
@@ -389,16 +390,56 @@ if st.session_state.questionnaire_shown:
                         try:
                             negative_feature_collection = upload_points_to_ee(uploaded_negatives_file, widget_prefix="NonDam")
                             if negative_feature_collection:
+                                # Process negative points with IDs
+                                fc = negative_feature_collection
+                                features_list = fc.toList(fc.size())
+                                indices = ee.List.sequence(0, fc.size().subtract(1))
+
+                                def set_id_negatives2(idx):
+                                    idx = ee.Number(idx)
+                                    feature = ee.Feature(features_list.get(idx))
+                                    return feature.set(
+                                        'id_property', ee.String('N').cat(idx.add(1).int().format())
+                                    )
+                                
+                                Neg_points_id = ee.FeatureCollection(indices.map(set_id_negatives2))
+                                
+                                # Get positive points
+                                if not st.session_state.use_all_dams:
+                                    Pos_collection = st.session_state.Dam_data
+                                else:
+                                    Pos_collection = st.session_state.Positive_collection
+                                
+                                Pos_collection = Pos_collection.map(lambda feature: feature.set('Dam', 'positive'))
+
+                                pos_features_list = Pos_collection.toList(Pos_collection.size())
+                                pos_indices = ee.List.sequence(0, Pos_collection.size().subtract(1))
+
+                                def set_id_positives(idx):
+                                    idx = ee.Number(idx)
+                                    feature = ee.Feature(pos_features_list.get(idx))
+                                    return feature.set(
+                                        'id_property', ee.String('P').cat(idx.add(1).int().format())
+                                    )
+
+                                Positive_dam_id = ee.FeatureCollection(pos_indices.map(set_id_positives))
+                                
+                                # Create merged collection
+                                Merged_collection = Positive_dam_id.merge(Neg_points_id)
+                                st.session_state.Merged_collection = Merged_collection
+                                
                                 st.session_state.Negative_upload_collection = negative_feature_collection
                                 st.session_state['Full_negative'] = st.session_state.Negative_upload_collection
                                 st.session_state.step4_complete = True
                                 st.success("✅ Non-dam locations uploaded successfully!")
+                                
                                 # Display data preview
                                 st.subheader("Data Preview")
                                 preview_map = geemap.Map()
                                 preview_map.add_basemap("SATELLITE")
-                                preview_map.addLayer(negative_feature_collection, {'color': 'red'}, 'Non-Dam Locations')
-                                preview_map.centerObject(negative_feature_collection)
+                                preview_map.addLayer(Neg_points_id, {'color': 'red'}, 'Non-Dam Locations')
+                                preview_map.addLayer(Positive_dam_id, {'color': 'blue'}, 'Dam Locations')
+                                preview_map.centerObject(Merged_collection)
                                 preview_map.to_streamlit(width=800, height=600)
                         except Exception as e:
                             st.error(f"Error processing file: {str(e)}")
@@ -406,15 +447,27 @@ if st.session_state.questionnaire_shown:
             if generate_negatives_checkbox:
                 st.subheader("Specify the parameters for negative point generation:")
                 st.image("assets/Negative_sampling_image.png")
-                innerRadius = st.number_input("Inner Radius (meters)", value=200, min_value=0, step=50, key="inner_radius_input")
-                outerRadius = st.number_input("Outer Radius (meters)", value=350, min_value=0, step=100, key="outer_radius_input")
+                innerRadius = st.number_input("Inner Radius (meters)", value=300, min_value=0, step=50, key="inner_radius_input")
+                outerRadius = st.number_input("Outer Radius (meters)", value=500, min_value=0, step=50, key="outer_radius_input")
                 samplingScale = 10
                 
                 if st.button("Generate Negative Points"):
                     with st.spinner("Generating negative points..."):
                         try:
+                            # Check required session state variables
+                            if 'Positive_collection' not in st.session_state:
+                                st.error("Positive dam data not found. Please complete Step 1 first.")
+                                st.stop()
+                                
+                            if 'selected_waterway' not in st.session_state:
+                                st.error("Waterway data not found. Please complete Step 2 first.")
+                                st.stop()
+                            
                             # Get the first positive dam for date
                             if not st.session_state.use_all_dams:
+                                if 'Dam_data' not in st.session_state:
+                                    st.error("Dam data not found. Please complete previous steps first.")
+                                    st.stop()
                                 positive_dams_fc = st.session_state.Dam_data
                             else:
                                 positive_dams_fc = st.session_state.Positive_collection
@@ -461,10 +514,19 @@ if st.session_state.questionnaire_shown:
                             # Get date from first positive dam
                             first_pos = positive_dams_fc.first()
                             date = ee.Date(first_pos.get('date'))
+                            if not date:
+                                st.error("No valid date found in the positive dam data. Please check your data.")
+                                st.stop()
+                                
                             year_string = date.format('YYYY')
                             full_date = ee.String(year_string).cat('-07-01')
                             
-                            negativePoints = negativePoints.map(lambda feature: feature.set('Dam', 'negative').set("date", full_date))
+                            # Process negative points with proper error handling
+                            try:
+                                negativePoints = negativePoints.map(lambda feature: feature.set('Dam', 'negative').set("date", full_date))
+                            except Exception as e:
+                                st.error(f"Error setting properties for negative points: {e}")
+                                st.stop()
                             
                             # Process negative points
                             fc = negativePoints
@@ -531,7 +593,7 @@ if st.session_state.questionnaire_shown:
             # Display buffer settings
             st.subheader("Buffer Settings")
             buffer_radius = st.number_input(
-                "Enter buffer radius (meters):", 
+                "Enter buffer radius (meters). We will analyze locations within this buffer that are no more than 3m in elevation away from the dam location.", 
                 min_value=1, 
                 step=1, 
                 value=st.session_state.buffer_radius,
@@ -604,12 +666,12 @@ if st.session_state.questionnaire_shown:
         if not st.session_state.get('step5_complete', False):
             st.error("Please complete Step 5 first.")
         else:
-            tab1, tab2 = st.tabs(["Initial Analysis", "Upstream & Downstream Analysis"])
+            tab1, tab2 = st.tabs(["Combined Analysis", "Upstream & Downstream Analysis"])
             
             with tab1:
                 if not st.session_state.visualization_complete:
-                    if st.button("Generate Initial Visualization"):
-                        with st.spinner("Processing visualization..."):
+                    if st.button("Analyze Combined Effects"):
+                        with st.spinner("Analyzing combined effects..."):
                             try:
                                 Dam_data = st.session_state.Dam_data
 

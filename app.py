@@ -13,20 +13,20 @@ about_page = st.Page(
 
 project_1_page = st.Page(
     page = "pages/Exports_page.py",
-    title = "Export Images!",
+    title = "Analyze Impacts!",
     icon = ":material/bar_chart:",
 
 )
 
-project_2_page = st.Page(
-    page = "pages/Quick_analysis.py",
-    title = "Quickly visualize!",
-    icon = ":material/bar_chart:",
+# project_2_page = st.Page(
+#     page = "pages/Quick_analysis.py",
+#     title = "Quickly visualize!",
+#     icon = ":material/bar_chart:",
 
-)
+# )
 
 
-pg = st.navigation(pages= [about_page,project_1_page,project_2_page])
+pg = st.navigation(pages= [about_page,project_1_page])
 # st.logo("assets\pngimg.com - beaver_PNG35.png")
 pg.run()
 

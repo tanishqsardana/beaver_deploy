@@ -257,7 +257,7 @@ def upload_points_to_ee(file, widget_prefix=""):
 
             # Year selection & default prompt
             selected_year = st.selectbox(
-                "Select a year (default date will be July 1 of selected year):",
+                "Select a year:",
                 list(range(2017, 2025)),
                 index=3,
                 key=f"{widget_prefix}_year_selectbox"
@@ -279,7 +279,7 @@ def upload_points_to_ee(file, widget_prefix=""):
                 standardized_features = list(filter(None, df.apply(standardize_feature, axis=1).tolist()))
                 feature_collection = ee.FeatureCollection(standardized_features)
 
-                st.success("CSV successfully uploaded and standardized. Preview the data on the map below and click 'Next' to proceed.")
+                st.success("CSV successfully uploaded and standardized. Preview the data on the map below.")
                 return feature_collection
 
         elif file.name.endswith(".geojson"):
@@ -296,7 +296,7 @@ def upload_points_to_ee(file, widget_prefix=""):
 
             # Year selection & default prompt for GeoJSON
             selected_year = st.selectbox(
-                "Select a year (default date will be July 1 of selected year):",
+                "Select a year:",
                 list(range(2017, 2025)),
                 index=3,
                 key=f"{widget_prefix}_geojson_year_selectbox"

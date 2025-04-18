@@ -52,14 +52,19 @@ def set_id_year_property_GEE_Collection(feature):
     return feature.set('id_property', feature_id).set('year', year).set('DamID', short_id)
 
 
-def set_id_negatives(idx):
-    idx = ee.Number(idx)
-    feature = ee.Feature(features_list.get(idx))
-    # Cast idx.add(1) to an integer and then format as a string without decimals.
-    labeled_feature = feature.set(
-        'id_property', ee.String('N').cat(idx.add(1).int().format())
-    )
-    return labeled_feature
+def set_id_negatives(feature_collection):
+    """Set IDs for negative points in a feature collection."""
+    features_list = feature_collection.toList(feature_collection.size())
+    indices = ee.List.sequence(0, feature_collection.size().subtract(1))
+    
+    def set_id(idx):
+        idx = ee.Number(idx)
+        feature = ee.Feature(features_list.get(idx))
+        return feature.set(
+            'id_property', ee.String('N').cat(idx.add(1).int().format())
+        )
+    
+    return ee.FeatureCollection(indices.map(set_id))
 
 # def add_dam_buffer_and_standardize_date(feature):
 #     # Add Dam property and other metadata
