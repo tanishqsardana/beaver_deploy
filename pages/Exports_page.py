@@ -398,9 +398,15 @@ if st.session_state.questionnaire_shown:
                                 def set_id_negatives2(idx):
                                     idx = ee.Number(idx)
                                     feature = ee.Feature(features_list.get(idx))
+                                    # Ensure each negative sample has a date property
+                                    date = feature.get('date')
+                                    if not date:
+                                        # Get date from positive samples
+                                        first_pos = st.session_state.Positive_collection.first()
+                                        date = first_pos.get('date')
                                     return feature.set(
                                         'id_property', ee.String('N').cat(idx.add(1).int().format())
-                                    )
+                                    ).set('date', date)
                                 
                                 Neg_points_id = ee.FeatureCollection(indices.map(set_id_negatives2))
                                 
@@ -418,9 +424,15 @@ if st.session_state.questionnaire_shown:
                                 def set_id_positives(idx):
                                     idx = ee.Number(idx)
                                     feature = ee.Feature(pos_features_list.get(idx))
+                                    # Ensure each positive sample has a date property
+                                    date = feature.get('date')
+                                    if not date:
+                                        # Get date from the first positive sample
+                                        first_pos = st.session_state.Positive_collection.first()
+                                        date = first_pos.get('date')
                                     return feature.set(
                                         'id_property', ee.String('P').cat(idx.add(1).int().format())
-                                    )
+                                    ).set('date', date)
 
                                 Positive_dam_id = ee.FeatureCollection(pos_indices.map(set_id_positives))
                                 
@@ -675,6 +687,21 @@ if st.session_state.questionnaire_shown:
                             try:
                                 Dam_data = st.session_state.Dam_data
 
+                                # 验证日期数据
+                                def validate_date(feature):
+                                    date = feature.get('Survey_Date')
+                                    if not date:
+                                        st.error("Found feature without date. Please check your data.")
+                                        return None
+                                    return feature
+
+                                # 过滤掉没有日期的数据
+                                Dam_data = Dam_data.map(validate_date).filter(ee.Filter.notNull(['Survey_Date']))
+
+                                if Dam_data.size().getInfo() == 0:
+                                    st.error("No valid data with dates found. Please check your data.")
+                                    st.stop()
+
                                 S2_cloud_mask_export = ee.ImageCollection(S2_Export_for_visual(Dam_data))
                                 S2_ImageCollection = ee.ImageCollection(S2_cloud_mask_export)
 
@@ -682,7 +709,15 @@ if st.session_state.questionnaire_shown:
                                 results_fc_lst = S2_with_LST.map(compute_all_metrics_LST_ET)
                                 results_fcc_lst = ee.FeatureCollection(results_fc_lst)
 
-                                df_lst = geemap.ee_to_df(results_fcc_lst)
+                                # 添加额外的错误检查
+                                try:
+                                    df_lst = geemap.ee_to_df(results_fcc_lst)
+                                except Exception as e:
+                                    st.error(f"Error converting to DataFrame: {e}")
+                                    st.error("This might be due to missing or invalid dates in your data.")
+                                    st.error("Please check that all your data points have valid dates.")
+                                    st.stop()
+
                                 df_lst['Image_month'] = pd.to_numeric(df_lst['Image_month'])
                                 df_lst['Image_year'] = pd.to_numeric(df_lst['Image_year'])
                                 df_lst['Dam_status'] = df_lst['Dam_status'].replace({'positive': 'Dam', 'negative': 'Non-dam'})
