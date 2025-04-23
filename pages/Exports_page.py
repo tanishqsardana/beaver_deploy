@@ -340,6 +340,7 @@ if st.session_state.questionnaire_shown:
                             st.session_state.use_all_dams = True
                             st.session_state.Dam_data = st.session_state['Full_positive']
                             st.session_state.show_non_dam_section = True
+                            st.session_state.validation_step = 'completed'
                             st.success("✅ Selected to continue with all dams.")
                     with col2:
                         if st.button("Only use valid dams"):
@@ -362,6 +363,7 @@ if st.session_state.questionnaire_shown:
                     st.session_state.use_all_dams = True
                     st.session_state.Dam_data = st.session_state['Full_positive']
                     st.session_state.show_non_dam_section = True
+                    st.session_state.validation_step = 'completed'
                     st.success("✅ All dams are valid.")
             else:
                 st.error("No validation results found. Please run validation first.")
