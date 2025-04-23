@@ -386,13 +386,13 @@ if st.session_state.questionnaire_shown:
             generate_negatives_checkbox = st.checkbox("Generate Non-Dam Locations")
 
             if upload_negatives_checkbox:
-                uploaded_negatives_file = st.file_uploader("Choose a CSV or GeoJSON file", type=["csv", "geojson"], key="Non_Dam_file_uploader")
-                if uploaded_negatives_file:
-                    with st.spinner("Processing uploaded file..."):
+                uploaded_negatives = st.file_uploader("Upload Non-Dam Dataset (CSV or GeoJSON)", type=["csv", "geojson"], key="negative_file_uploader")
+                if uploaded_negatives:
+                    with st.spinner("Processing uploaded non-dam data..."):
                         try:
-                            negative_feature_collection = upload_points_to_ee(uploaded_negatives_file, widget_prefix="NonDam")
+                            negative_feature_collection = upload_points_to_ee(uploaded_negatives, widget_prefix="NonDam")
                             if negative_feature_collection:
-                                # Process negative points with IDs
+                                # 处理负样本数据
                                 fc = negative_feature_collection
                                 features_list = fc.toList(fc.size())
                                 indices = ee.List.sequence(0, fc.size().subtract(1))
@@ -400,19 +400,19 @@ if st.session_state.questionnaire_shown:
                                 def set_id_negatives2(idx):
                                     idx = ee.Number(idx)
                                     feature = ee.Feature(features_list.get(idx))
-                                    # Ensure each negative sample has a date property
+                                    # 确保每个负样本都有日期属性
                                     date = feature.get('date')
                                     if not date:
-                                        # Get date from positive samples
+                                        # 从正样本获取日期
                                         first_pos = st.session_state.Positive_collection.first()
                                         date = first_pos.get('date')
                                     return feature.set(
                                         'id_property', ee.String('N').cat(idx.add(1).int().format())
-                                    ).set('date', date)
+                                    ).set('date', date).set('Dam', 'negative')
                                 
                                 Neg_points_id = ee.FeatureCollection(indices.map(set_id_negatives2))
                                 
-                                # Get positive points
+                                # 处理正样本数据
                                 if not st.session_state.use_all_dams:
                                     Pos_collection = st.session_state.Dam_data
                                 else:
@@ -426,10 +426,10 @@ if st.session_state.questionnaire_shown:
                                 def set_id_positives(idx):
                                     idx = ee.Number(idx)
                                     feature = ee.Feature(pos_features_list.get(idx))
-                                    # Ensure each positive sample has a date property
+                                    # 确保每个正样本都有日期属性
                                     date = feature.get('date')
                                     if not date:
-                                        # Get date from the first positive sample
+                                        # 从第一个正样本获取日期
                                         first_pos = st.session_state.Positive_collection.first()
                                         date = first_pos.get('date')
                                     return feature.set(
@@ -438,25 +438,28 @@ if st.session_state.questionnaire_shown:
 
                                 Positive_dam_id = ee.FeatureCollection(pos_indices.map(set_id_positives))
                                 
-                                # Create merged collection
+                                # 创建合并集合
                                 Merged_collection = Positive_dam_id.merge(Neg_points_id)
                                 st.session_state.Merged_collection = Merged_collection
                                 
+                                # 设置状态变量
                                 st.session_state.Negative_upload_collection = negative_feature_collection
                                 st.session_state['Full_negative'] = st.session_state.Negative_upload_collection
+                                st.session_state.buffer_complete = True
                                 st.session_state.step4_complete = True
-                                st.success("✅ Non-dam locations uploaded successfully!")
+                                st.success("✅ 非水坝位置上传成功！")
                                 
-                                # Display data preview
-                                st.subheader("Data Preview")
+                                # 显示数据预览
+                                st.subheader("数据预览")
                                 preview_map = geemap.Map()
                                 preview_map.add_basemap("SATELLITE")
-                                preview_map.addLayer(Neg_points_id, {'color': 'red'}, 'Non-Dam Locations')
-                                preview_map.addLayer(Positive_dam_id, {'color': 'blue'}, 'Dam Locations')
+                                preview_map.addLayer(Neg_points_id, {'color': 'red'}, '非水坝位置')
+                                preview_map.addLayer(Positive_dam_id, {'color': 'blue'}, '水坝位置')
                                 preview_map.centerObject(Merged_collection)
                                 preview_map.to_streamlit(width=800, height=600)
                         except Exception as e:
-                            st.error(f"Error processing file: {str(e)}")
+                            st.error(f"处理文件时出错: {str(e)}")
+                            st.error(traceback.format_exc())  # 显示详细错误信息
 
             if generate_negatives_checkbox:
                 st.subheader("Specify the parameters for negative point generation:")
@@ -624,17 +627,31 @@ if st.session_state.questionnaire_shown:
                         full_date = ee.String(year_string).cat('-07-01')
 
                         def add_dam_buffer_and_standardize_date(feature):
-                            # Add Dam property and other metadata
+                            # Get Dam status and other metadata
                             dam_status = feature.get("Dam")
                             
-                            # Force the date to July 1st of the specified year
-                            standardized_date = date
-                            formatted_date = date.format('YYYYMMdd')
                             
-                            # Buffer geometry while retaining properties
+                            date = feature.get("date")
+                            if not date:
+                                date = feature.get("Survey_Date")
+                                if not date:
+                                    try:
+                                        first_pos = st.session_state.Positive_collection.first()
+                                        date = first_pos.get("date")
+                                        if not date:
+                                            st.error("Can't find date in the data. Please check your data.")
+                                            return None
+                                    except Exception as e:
+                                        st.error(f"{str(e)}")
+                                        return None
+                            
+                            standardized_date = ee.Date(date)
+                            formatted_date = standardized_date.format('YYYYMMdd')
+                            
+                            # Create buffered geometry while preserving properties
                             buffered_geometry = feature.geometry().buffer(buffer_radius)
                             
-                            # Create a new feature with buffered geometry and updated properties
+                            # Create new feature with buffered geometry and updated properties
                             return ee.Feature(buffered_geometry).set({
                                 "Dam": dam_status,
                                 "Survey_Date": standardized_date,
@@ -689,15 +706,21 @@ if st.session_state.questionnaire_shown:
                             try:
                                 Dam_data = st.session_state.Dam_data
 
-                                # 验证日期数据
                                 def validate_date(feature):
-                                    date = feature.get('Survey_Date')
-                                    if not date:
-                                        st.error("Found feature without date. Please check your data.")
+                                    try:
+                                        date = feature.get('Survey_Date')
+                                        if not date:
+                                            date = feature.get('date')
+                                            if not date:
+                                                st.error("Find no date in the data. Please check your data.")
+                                                return None
+                                        
+                                        standardized_date = ee.Date(date)
+                                        return feature
+                                    except Exception as e:
+                                        st.error(f"日期验证错误: {str(e)}")
                                         return None
-                                    return feature
 
-                                # 过滤掉没有日期的数据
                                 Dam_data = Dam_data.map(validate_date).filter(ee.Filter.notNull(['Survey_Date']))
 
                                 if Dam_data.size().getInfo() == 0:
@@ -711,7 +734,6 @@ if st.session_state.questionnaire_shown:
                                 results_fc_lst = S2_with_LST.map(compute_all_metrics_LST_ET)
                                 results_fcc_lst = ee.FeatureCollection(results_fc_lst)
 
-                                # 添加额外的错误检查
                                 try:
                                     df_lst = geemap.ee_to_df(results_fcc_lst)
                                 except Exception as e:
