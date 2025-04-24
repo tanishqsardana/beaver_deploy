@@ -45,143 +45,119 @@ ee.Initialize(credentials)
 ### Filtering without flow direction
 def S2_Export_for_visual(Dam_Collection):
     def extract_pixels(box):
-        imageDate = ee.Date(box.get("Survey_Date"))
-        StartDate = imageDate.advance(-6, 'month').format("YYYY-MM-dd")
+        try:
+            imageDate = ee.Date(box.get("Survey_Date"))
+            StartDate = imageDate.advance(-6, 'month').format("YYYY-MM-dd")
+            EndDate = imageDate.advance(6, 'month').format("YYYY-MM-dd")
 
-        EndDate = imageDate.advance(6, 'month').format("YYYY-MM-dd")
+            boxArea = box.geometry()
+            damId = box.get("id_property")
+            DamStatus = box.get('Dam')
+            DamDate = box.get('Damdate')
+            DamGeo = box.get('Point_geo')
 
-        boxArea = box.geometry()
-        DateString = box.get("stringID")
-        damId = box.get("id_property")
-        DamStatus = box.get('Dam')
-        DamDate = box.get('Damdate')
-        DamGeo = box.get('Point_geo')
-        S2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
-
-        ## Add band for cloud coverage
-        def add_cloud_mask_band(image):
-            qa = image.select('QA60')
-
-            # Bits 10 and 11 are clouds and cirrus, respectively.
-            cloudBitMask = 1 << 10
-            cirrusBitMask = 1 << 11
-
-            # Both flags should be set to zero, indicating clear conditions.
-            cloud_mask = qa.bitwiseAnd(cloudBitMask).eq(0).And(
-                qa.bitwiseAnd(cirrusBitMask).eq(0)
+            # Ensure Point_geo is a valid point geometry
+            point_geo = ee.Algorithms.If(
+                ee.Algorithms.IsEqual(DamGeo, None),
+                boxArea.centroid(),  # Use centroid if Point_geo is None
+                DamGeo
             )
-            # Create a band with values 1 (clear) and 0 (cloudy or cirrus) and convert from byte to Uint16
-            cloud_mask_band = cloud_mask.rename('cloudMask').toUint16()
 
-            return image.addBands(cloud_mask_band)
+            S2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
 
-        # Define the dataset
-        S2_cloud_band = S2.map(add_cloud_mask_band)
+            def add_cloud_mask_band(image):
+                qa = image.select('QA60')
+                cloudBitMask = 1 << 10
+                cirrusBitMask = 1 << 11
+                cloud_mask = qa.bitwiseAnd(cloudBitMask).eq(0).And(
+                    qa.bitwiseAnd(cirrusBitMask).eq(0)
+                )
+                cloud_mask_band = cloud_mask.rename('cloudMask').toUint16()
+                return image.addBands(cloud_mask_band)
 
+            S2_cloud_band = S2.map(add_cloud_mask_band)
 
-        # Change band names
-        oldBandNames = ['B2', 'B3', 'B4', 'B8','cloudMask']
-        newBandNames = ['S2_Blue', 'S2_Green', 'S2_Red', 'S2_NIR','S2_Binary_cloudMask']#'S2_NDVI']
+            oldBandNames = ['B2', 'B3', 'B4', 'B8','cloudMask']
+            newBandNames = ['S2_Blue', 'S2_Green', 'S2_Red', 'S2_NIR','S2_Binary_cloudMask']
+            S2_named_bands = S2_cloud_band.map(lambda image: image.select(oldBandNames).rename(newBandNames))
 
-        S2_named_bands = S2_cloud_band.map(lambda image: image.select(oldBandNames).rename(newBandNames))
+            def addAcquisitionDate(image):
+                date = ee.Date(image.get('system:time_start'))
+                return image.set('acquisition_date', date)
 
-        # Define a function to add the masked image as a band to the images
-        def addAcquisitionDate(image):
-            date = ee.Date(image.get('system:time_start'))
-            return image.set('acquisition_date', date)
+            S2_cloud_filter = S2_named_bands.map(addAcquisitionDate)
+            filteredCollection = S2_cloud_filter.filterDate(StartDate, EndDate).filterBounds(boxArea)
 
-        S2_cloud_filter = S2_named_bands.map(addAcquisitionDate)
+            def add_band(image):
+                index = image.get("system:index")
+                image_date = ee.Date(image.get('system:time_start'))
+                image_month = image_date.get('month')
+                image_year = image_date.get('year')
+                
+                dataset = ee.Image('USGS/3DEP/10m')
+                elevation_select = dataset.select('elevation')
+                elevation = ee.Image(elevation_select)
+                
+                point_geom = point_geo  # Use processed point_geo
+                point_elevation = ee.Number(elevation.sample(point_geom, 10).first().get('elevation'))
+                buffered_area = boxArea
+                elevation_clipped = elevation.clip(buffered_area)
 
-        filteredCollection = S2_cloud_filter.filterDate(StartDate, EndDate).filterBounds(boxArea)
+                point_plus = point_elevation.add(3)
+                point_minus = point_elevation.subtract(5)        
+                elevation_masked = elevation_clipped.where(elevation_clipped.lt(point_minus), 0).where(elevation_clipped.gt(point_minus), 1).where(elevation_clipped.gt(point_plus), 0)
+                elevation_masked2 = elevation_masked.updateMask(elevation_masked.eq(1))
 
+                Full_image = image.set("First_id", ee.String(damId).cat("_").cat(DamStatus).cat("_S2id:_").cat(index).cat("_").cat(DamDate))\
+                    .set("Dam_id", damId)\
+                    .set("Dam_status", DamStatus)\
+                    .set("Image_month", image_month)\
+                    .set("Image_year", image_year)\
+                    .set("Area", boxArea)\
+                    .set("id_property", damId)\
+                    .set("Point_geo", point_geo)\
+                    .clip(boxArea)
+                
+                return Full_image.addBands(elevation_masked2)
+
+            filteredCollection2 = filteredCollection.map(add_band)
+
+            def calculate_cloud_coverage(image):
+                cloud = image.select('S2_Binary_cloudMask')
+                cloud_stats = cloud.reduceRegion(
+                    reducer=ee.Reducer.mean(),
+                    geometry=image.geometry(),
+                    scale=10,
+                    maxPixels=1e9
+                )
+                clear_coverage_percentage = ee.Number(cloud_stats.get('S2_Binary_cloudMask')).multiply(100).round()
+                cloud_coverage_percentage = ee.Number(100).subtract(clear_coverage_percentage)
+                return image.set('Cloud_coverage', cloud_coverage_percentage)
+
+            filteredCloudCollection = filteredCollection2.map(calculate_cloud_coverage)
+
+            def get_monthly_least_cloudy_images(Collection):
+                months = ee.List.sequence(1, 12)
+                def get_month_image(month):
+                    monthly_images = Collection.filter(ee.Filter.calendarRange(month, month, 'month'))
+                    return ee.Image(monthly_images.sort('CLOUDY_PIXEL_PERCENTAGE').first())
+                
+                monthly_images_list = months.map(get_month_image)
+                return ee.ImageCollection.fromImages(monthly_images_list)
             
-        def add_band(image):
-            index = image.get("system:index")
-            image_date = ee.Date(image.get('system:time_start'))
-            image_month = image_date.get('month')
-            image_year = image_date.get('year')
-            cloud = image.get('CLOUDY_PIXEL_PERCENTAGE')
-            # intersect = image.get('intersection_ratio')
-            
-            dataset = ee.Image('USGS/3DEP/10m')
-            elevation_select = dataset.select('elevation')
-            elevation = ee.Image(elevation_select)
+            filteredCollectionBands = get_monthly_least_cloudy_images(filteredCloudCollection)
 
-            # Extract sample area from elevation
-            point_geom = DamGeo
+            def addCloud(image):
+                id = image.get("First_id")
+                cloud = image.get("Cloud_coverage")
+                return image.set("Full_id", ee.String(id).cat("_Cloud_").cat(cloud))
 
-            # Extract elevation of dam location
-            point_elevation = ee.Number(elevation.sample(point_geom, 10).first().get('elevation'))
-            buffered_area = boxArea
-            elevation_clipped = elevation.clip(buffered_area)
+            Complete_collection = filteredCollectionBands.map(addCloud)
+            return Complete_collection
 
-            # Create elevation radius around point to sample from
-            point_plus = point_elevation.add(3)
-            point_minus = point_elevation.subtract(5)        
-            elevation_masked = elevation_clipped.where(elevation_clipped.lt(point_minus), 0).where(elevation_clipped.gt(point_minus), 1).where(elevation_clipped.gt(point_plus), 0)
-            elevation_masked2 = elevation_masked.updateMask(elevation_masked.eq(1));
-
-            # Add bands, create new "id" property to name the file, and clip the images to the ROI
-            # Full_image = image.set("First_id", ee.String(damId).cat("_").cat(DamStatus).cat("_S2id:_").cat(index).cat("_").cat(DamDate).cat("_intersect_").cat(intersect))\
-            Full_image = image.set("First_id", ee.String(damId).cat("_").cat(DamStatus).cat("_S2id:_").cat(index).cat("_").cat(DamDate).cat("_intersect_"))\
-                .set("Dam_id",damId)\
-                .set("Dam_status",DamStatus)\
-                .set("Image_month",image_month)\
-                .set("Image_year",image_year)\
-                .set("Area", boxArea)\
-                .clip(boxArea)
-            Full_image2 = Full_image.addBands(elevation_masked2)
-            ## maybe add point geo as a property
-            
-        
-            return Full_image2
-            
-        filteredCollection2 = filteredCollection.map(add_band)
-
-        def calculate_cloud_coverage(image):
-            cloud = image.select('S2_Binary_cloudMask')
-
-            # Compute cloud coverage percentage using a simpler approach
-            cloud_stats = cloud.reduceRegion(
-                reducer=ee.Reducer.mean(),
-                geometry=image.geometry(),
-                scale=10,
-                maxPixels=1e9
-            )
-            
-            clear_coverage_percentage = ee.Number(cloud_stats.get('S2_Binary_cloudMask')).multiply(100).round()
-            cloud_coverage_percentage = ee.Number(100).subtract(clear_coverage_percentage)  # Invert the percentage
-
-            return image.set('Cloud_coverage', cloud_coverage_percentage)
-
-
-        filteredCloudCollection = filteredCollection2.map(calculate_cloud_coverage)
-        # filteredCollection_overlap = filteredCloudCollection.filterMetadata('intersection_ratio', 'greater_than', 0.95)
-
-        
-        # Group by month and get the least cloudy image for each month
-        def get_monthly_least_cloudy_images(Collection):
-            months = ee.List.sequence(1, 12)
-            def get_month_image(month):
-                monthly_images = Collection.filter(ee.Filter.calendarRange(month, month, 'month'))
-                return ee.Image(monthly_images.sort('CLOUDY_PIXEL_PERCENTAGE').first())
-            
-            monthly_images_list = months.map(get_month_image)
-            monthly_images_collection = ee.ImageCollection.fromImages(monthly_images_list)
-            return monthly_images_collection
-            
-        # filteredCollectionBands = get_monthly_least_cloudy_images(filteredCollection_overlap) 
-        filteredCollectionBands = get_monthly_least_cloudy_images(filteredCloudCollection) 
-
-        def addCloud(image):
-            id = image.get("First_id")
-            cloud = image.get("Cloud_coverage")
-            Complete_id = image.set("Full_id", ee.String(id).cat("_Cloud_").cat(cloud))
-            return Complete_id
-
-        Complete_collection = filteredCollectionBands.map(addCloud)
-        
-        return Complete_collection 
+        except Exception as e:
+            st.warning(f"Error processing image: {str(e)}")
+            return None
 
     ImageryCollections = Dam_Collection.map(extract_pixels).flatten()
     return ee.ImageCollection(ImageryCollections)
@@ -1000,6 +976,7 @@ def compute_all_metrics_LST_ET(image):
     month = image.get('Image_month')
     status = image.get('Dam_status')
     year = image.get('Image_year')
+    id_property = image.get('id_property')  # Add id_property
 
     # Combine all metrics & metadata into a dictionary
     combined_metrics = ee.Dictionary({
@@ -1009,7 +986,8 @@ def compute_all_metrics_LST_ET(image):
         'ET': et_mean,  # 🚀 New: Adding ET to the feature
         'Image_month': month,
         'Image_year': year,
-        'Dam_status': status
+        'Dam_status': status,
+        'id_property': id_property  # Add id_property to the dictionary
     })
 
     # Return as an ee.Feature
@@ -1017,18 +995,48 @@ def compute_all_metrics_LST_ET(image):
 
 
 ###### Upstream and downstream
+def extract_coordinates_df(dam_data):
+    """
+    Extract coordinates from dam data and return a DataFrame with id_property and coordinates.
+    """
+    try:
+        # Extract features from dam_data
+        features = dam_data.getInfo()['features']
+        
+        # Create a list to store coordinates
+        coords_data = []
+        
+        for feature in features:
+            properties = feature['properties']
+            id_property = properties.get('id_property')
+            point_geo = properties.get('Point_geo')
+            
+            if point_geo:
+                # Extract coordinates from Point_geo
+                coords = point_geo['coordinates']
+                coords_data.append({
+                    'id_property': id_property,
+                    'longitude': coords[0],
+                    'latitude': coords[1]
+                })
+        
+        # Convert to DataFrame
+        coords_df = pd.DataFrame(coords_data)
+        return coords_df
+        
+    except Exception as e:
+        st.warning(f"Error extracting coordinates: {str(e)}")
+        return pd.DataFrame(columns=['id_property', 'longitude', 'latitude'])
+
 def compute_all_metrics_up_downstream(image):
     """
     Returns an ee.Feature containing separate upstream/downstream mean NDVI, NDWI_Green, LST, and ET.
     """
-
-    # 1) Grab upstream/downstream mask bands (these are 1 where valid, masked = 0 otherwise)
+    # 1) Grab upstream/downstream mask bands
     upstream_mask = image.select('upstream')
     downstream_mask = image.select('downstream')
     
-    # If these bands don't exist, skip (handle gracefully)
-    #   but normally they should exist from your `add_band` step
-    #   We'll do a quick check:
+    # Check if bands exist
     valid_up = upstream_mask.reduceRegion(
         reducer=ee.Reducer.count(),
         geometry=image.geometry(),
@@ -1078,7 +1086,7 @@ def compute_all_metrics_up_downstream(image):
         maxPixels=1e13
     ).get('NDWI_Green')
 
-    # 4) LST band (added by add_landsat_lst_et)
+    # 4) LST band
     lst = image.select('LST')
     lst_up = lst.updateMask(upstream_mask).reduceRegion(
         reducer=ee.Reducer.mean(),
@@ -1094,7 +1102,7 @@ def compute_all_metrics_up_downstream(image):
         maxPixels=1e13
     ).get('LST')
 
-    # 5) ET band (added by add_landsat_lst_et)
+    # 5) ET band
     et = image.select('ET')
     et_up = et.updateMask(upstream_mask).reduceRegion(
         reducer=ee.Reducer.mean(),
@@ -1110,16 +1118,18 @@ def compute_all_metrics_up_downstream(image):
         maxPixels=1e13
     ).get('ET')
     
-    # 6) Extract metadata (month, year, dam status, etc.)
+    # 6) Extract metadata
     month = image.get('Image_month')
     status = image.get('Dam_status')
     year = image.get('Image_year')
+    id_property = image.get('id_property')
 
     # Combine everything into a dictionary
     combined_metrics = ee.Dictionary({
         'Image_month': month,
         'Image_year': year,
         'Dam_status': status,
+        'id_property': id_property,
         
         'NDVI_up': ndvi_up,
         'NDVI_down': ndvi_down,
