@@ -35,6 +35,63 @@ from service.Validation_service import (
 import json
 from google.oauth2 import service_account
 
+def extract_coordinates_df(dam_data):
+    """
+    Extract coordinates from Dam_data and create a DataFrame with id_property and coordinates
+    
+    Args:
+        dam_data: Earth Engine Feature Collection containing dam data
+        
+    Returns:
+        DataFrame with id_property, longitude, and latitude columns
+    """
+    try:
+        # Get features from Dam_data
+        dam_features = dam_data.getInfo()['features']
+        
+        coords_data = []
+        for i, feature in enumerate(dam_features):
+            try:
+                props = feature['properties']
+                id_prop = props.get('id_property')
+                
+                if not id_prop:
+                    st.warning(f"Feature {i} missing id_property")
+                    continue
+                
+                
+                # Extract coordinates from Point_geo
+                if 'Point_geo' in props:
+                    point_geo = props['Point_geo']
+                    
+                    if isinstance(point_geo, dict) and 'coordinates' in point_geo:
+                        coords = point_geo['coordinates']
+                        if isinstance(coords, list) and len(coords) >= 2:
+                            coords_data.append({
+                                'id_property': id_prop,
+                                'longitude': coords[0],
+                                'latitude': coords[1]
+                            })
+                        else:
+                            st.warning(f"Invalid coordinates format for feature {i}: {coords}")
+                    else:
+                        st.warning(f"Point_geo missing coordinates for feature {i}")
+                else:
+                    st.warning(f"No Point_geo found for feature {i}")
+                    
+            except Exception as e:
+                st.warning(f"Error processing feature {i}: {str(e)}")
+                continue
+                
+        # Create DataFrame from coordinates data
+        coords_df = pd.DataFrame(coords_data)
+        
+            
+        return coords_df
+    except Exception as e:
+        st.warning(f"Could not extract coordinates: {str(e)}")
+        return pd.DataFrame(columns=['id_property', 'longitude', 'latitude'])
+
 credentials_info = {
     "type": st.secrets["gcp_service_account"]["type"],
     "project_id": st.secrets["gcp_service_account"]["project_id"],
@@ -358,7 +415,6 @@ if st.session_state.questionnaire_shown:
                             else:
                                 st.warning("No valid dams found. Please adjust the validation criteria.")
                 else:
-                    st.success("All dam locations are valid!")
                     st.session_state.validation_complete = True
                     st.session_state.use_all_dams = True
                     st.session_state.Dam_data = st.session_state['Full_positive']
@@ -780,7 +836,57 @@ if st.session_state.questionnaire_shown:
                         st.download_button("Download Combined Figures", buf, "combined_trends.png", "image/png")
 
                     with col2:
-                        csv = st.session_state.df_lst.to_csv(index=False).encode('utf-8')
+                        # Create export DataFrame with coordinates
+                        if st.session_state.df_lst is not None and 'Dam_data' in st.session_state:
+                            export_df = st.session_state.df_lst.copy()
+                            
+                            
+                            # Extract coordinates and merge with main data
+                            coords_df = extract_coordinates_df(st.session_state.Dam_data)
+                            
+                            if not coords_df.empty:
+                                
+                                if 'id_property' in export_df.columns:
+                                    # Check for matching id_property values
+                                    export_ids = set(export_df['id_property'].unique())
+                                    coord_ids = set(coords_df['id_property'].unique())
+                                
+                                    
+                                    # Find missing IDs
+                                    missing_in_coords = export_ids - coord_ids
+                                    if missing_in_coords:
+                                        st.warning(f"Missing coordinates for IDs: {list(missing_in_coords)[:5]}...")
+                                    
+                                    # Merge using id_property
+                                    export_df = export_df.merge(coords_df, on='id_property', how='left')
+                                
+                                    
+                                    # Check for NaN values
+                                    nan_coords = export_df[export_df['longitude'].isna()].shape[0]
+                                    if nan_coords > 0:
+                                        st.warning(f"{nan_coords} rows could not be matched with coordinates")
+                                        st.write("Sample of rows with missing coordinates:")
+                                        st.write(export_df[export_df['longitude'].isna()].head())
+                                    
+                                    # Fill NaN values with 0
+                                    export_df['longitude'] = export_df['longitude'].fillna(0)
+                                    export_df['latitude'] = export_df['latitude'].fillna(0)
+                                    
+                                else:
+                                    st.error("Export DataFrame missing 'id_property' column")
+                                    st.write("Export DataFrame columns:", export_df.columns)
+                            else:
+                                st.warning("No coordinates were extracted from the features")
+                                # Add placeholder columns
+                                export_df['longitude'] = 0
+                                export_df['latitude'] = 0
+                        else:
+                            st.error("Export DataFrame or Dam_data not found in session state")
+                            export_df = st.session_state.df_lst.copy()
+                            export_df['longitude'] = 0
+                            export_df['latitude'] = 0
+                            
+                        csv = export_df.to_csv(index=False).encode('utf-8')
                         st.download_button("Download Combined Data (CSV)", csv, "combined_data.csv", "text/csv")
 
             with tab2:
@@ -867,14 +973,54 @@ if st.session_state.questionnaire_shown:
                                         )
                                     
                                     with col4:
-                                        csv2 = final_df.to_csv(index=False).encode('utf-8')
-                                        st.download_button(
-                                            "Download Up/Downstream Data (CSV)", 
-                                            csv2, 
-                                            "updown_data.csv", 
-                                            "text/csv",
-                                            key="download_updown_csv"
-                                        )
+                                        if 'final_df' in st.session_state and st.session_state.final_df is not None:
+                                            # Create export DataFrame with coordinates
+                                            export_df = st.session_state.final_df.copy()
+                                            
+                                            # Extract coordinates and merge with main data
+                                            if 'Dam_data' in st.session_state:
+                                                coords_df = extract_coordinates_df(st.session_state.Dam_data)
+                                                
+                                                if not coords_df.empty:
+                                                    # Calculate number of months per point
+                                                    months_per_point = len(export_df) // len(coords_df)
+                                                    
+                                                    # Create a list to store coordinates
+                                                    longitudes = []
+                                                    latitudes = []
+                                                    
+                                                    # Assign coordinates to each point's data
+                                                    for i in range(len(coords_df)):
+                                                        coords = coords_df.iloc[i]
+                                                        # Add coordinates for each month
+                                                        for _ in range(months_per_point):
+                                                            longitudes.append(coords['longitude'])
+                                                            latitudes.append(coords['latitude'])
+                                                    
+                                                    # Add coordinates to export_df
+                                                    export_df['longitude'] = longitudes
+                                                    export_df['latitude'] = latitudes
+                                                    
+
+                                                else:
+                                                    st.warning("No coordinates were extracted from the features")
+                                                    # Add placeholder columns
+                                                    export_df['longitude'] = 0
+                                                    export_df['latitude'] = 0
+                                            else:
+                                                st.error("Dam_data not found in session state")
+                                                # Add placeholder columns
+                                                export_df['longitude'] = 0
+                                                export_df['latitude'] = 0
+                                                
+                                            csv2 = export_df.to_csv(index=False).encode('utf-8')
+                                            st.download_button(
+                                                "Download Up/Downstream Data (CSV)", 
+                                                csv2, 
+                                                "updown_data.csv", 
+                                                "text/csv",
+                                                key="download_updown_csv"
+                                            )
                             except Exception as e:
                                 st.error(f"Analysis error: {e}")
                                 st.code(traceback.format_exc())
@@ -892,9 +1038,49 @@ if st.session_state.questionnaire_shown:
                                       key="redisplay_updown_fig")
                                       
                     with col4:
-                        if 'final_df' in st.session_state:
-                            csv2 = st.session_state.final_df.to_csv(index=False).encode('utf-8')
-                            st.download_button("Download Up/Downstream Data (CSV)", csv2, "updown_data.csv", "text/csv",
-                                          key="redisplay_updown_csv")
+                        if 'final_df' in st.session_state and st.session_state.final_df is not None:
+                            # Create export DataFrame with coordinates
+                            export_df = st.session_state.final_df.copy()
+                            
+                            # Extract coordinates and merge with main data
+                            if 'Dam_data' in st.session_state:
+                                coords_df = extract_coordinates_df(st.session_state.Dam_data)
+                                
+                                if not coords_df.empty:                                    
+                                    # Create a list to store coordinates
+                                    longitudes = []
+                                    latitudes = []
+                                    
+                                    # Assign coordinates to each point's data
+                                    for i in range(len(coords_df)):
+                                        coords = coords_df.iloc[i]
+                                        # Add coordinates for each month
+                                        for _ in range(months_per_point):
+                                            longitudes.append(coords['longitude'])
+                                            latitudes.append(coords['latitude'])
+                                    
+                                    # Add coordinates to export_df
+                                    export_df['longitude'] = longitudes
+                                    export_df['latitude'] = latitudes
+                                    
+                                else:
+                                    st.warning("No coordinates were extracted from the features")
+                                    # Add placeholder columns
+                                    export_df['longitude'] = 0
+                                    export_df['latitude'] = 0
+                            else:
+                                st.error("Dam_data not found in session state")
+                                # Add placeholder columns
+                                export_df['longitude'] = 0
+                                export_df['latitude'] = 0
+                                
+                            csv2 = export_df.to_csv(index=False).encode('utf-8')
+                            st.download_button(
+                                "Download Up/Downstream Data (CSV)", 
+                                csv2, 
+                                "updown_data.csv", 
+                                "text/csv",
+                                key="download_updown_csv"
+                            )
                                           
                     st.success("Upstream & downstream analysis data loaded from session.")

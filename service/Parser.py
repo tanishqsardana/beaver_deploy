@@ -493,7 +493,6 @@ def upload_non_dam_points_to_ee(file, dam_date=None, widget_prefix=""):
             )
             
             # Display the date that will be used
-            st.info(f"Date to be used for all non-dam points: {dam_date}")
 
             if st.button("Confirm and Process Data", key=f"{widget_prefix}_nondam_process_data_button"):
                 def standardize_feature(row):
@@ -507,7 +506,6 @@ def upload_non_dam_points_to_ee(file, dam_date=None, widget_prefix=""):
                 standardized_features = list(filter(None, df.apply(standardize_feature, axis=1).tolist()))
                 feature_collection = ee.FeatureCollection(standardized_features)
 
-                st.success("Non-dam points CSV successfully uploaded and standardized. Preview the data on the map below.")
                 return feature_collection
 
         elif file.name.endswith(".geojson"):
@@ -523,7 +521,6 @@ def upload_non_dam_points_to_ee(file, dam_date=None, widget_prefix=""):
                 return None
                 
             # Display the date that will be used
-            st.info(f"Date to be used for all non-dam points: {dam_date}")
 
             if st.button("Confirm and Process GeoJSON", key=f"{widget_prefix}_nondam_geojson_process_button"):
                 features = []
