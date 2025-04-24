@@ -450,11 +450,7 @@ if st.session_state.questionnaire_shown:
                             # This will use the date from dam data and not ask user to select a year
                             negative_feature_collection = upload_non_dam_points_to_ee(uploaded_negatives, widget_prefix="NonDam")
                             if negative_feature_collection:
-<<<<<<< HEAD
                                 # Process negative sample data
-=======
-                                # Process negative samples
->>>>>>> dev/chris
                                 fc = negative_feature_collection
                                 features_list = fc.toList(fc.size())
                                 indices = ee.List.sequence(0, fc.size().subtract(1))
@@ -462,15 +458,10 @@ if st.session_state.questionnaire_shown:
                                 def set_id_negatives2(idx):
                                     idx = ee.Number(idx)
                                     feature = ee.Feature(features_list.get(idx))
-<<<<<<< HEAD
-                                    date = feature.get('date')
-                                    if not date:
-=======
                                     # Ensure each negative sample has a date property
                                     date = feature.get('date')
                                     if not date:
                                         # Get date from the first positive sample
->>>>>>> dev/chris
                                         first_pos = st.session_state.Positive_collection.first()
                                         date = first_pos.get('date')
                                     return feature.set(
@@ -479,10 +470,7 @@ if st.session_state.questionnaire_shown:
                                 
                                 Neg_points_id = ee.FeatureCollection(indices.map(set_id_negatives2))
                                 
-<<<<<<< HEAD
-=======
                                 # Process positive samples
->>>>>>> dev/chris
                                 if not st.session_state.use_all_dams:
                                     Pos_collection = st.session_state.Dam_data
                                 else:
@@ -496,15 +484,10 @@ if st.session_state.questionnaire_shown:
                                 def set_id_positives(idx):
                                     idx = ee.Number(idx)
                                     feature = ee.Feature(pos_features_list.get(idx))
-<<<<<<< HEAD
-                                    date = feature.get('date')
-                                    if not date:
-=======
                                     # Ensure each positive sample has a date property
                                     date = feature.get('date')
                                     if not date:
                                         # Get date from the first positive sample
->>>>>>> dev/chris
                                         first_pos = st.session_state.Positive_collection.first()
                                         date = first_pos.get('date')
                                     return feature.set(
@@ -513,29 +496,15 @@ if st.session_state.questionnaire_shown:
 
                                 Positive_dam_id = ee.FeatureCollection(pos_indices.map(set_id_positives))
                                 
-<<<<<<< HEAD
-                                Merged_collection = Positive_dam_id.merge(Neg_points_id)
-                                st.session_state.Merged_collection = Merged_collection
-                                
-=======
                                 # Create merged collection
                                 Merged_collection = Positive_dam_id.merge(Neg_points_id)
                                 st.session_state.Merged_collection = Merged_collection
                                 
                                 # Set state variables
->>>>>>> dev/chris
                                 st.session_state.Negative_upload_collection = negative_feature_collection
                                 st.session_state['Full_negative'] = st.session_state.Negative_upload_collection
                                 st.session_state.buffer_complete = True
                                 st.session_state.step4_complete = True
-<<<<<<< HEAD
-                                
-                                st.subheader("Data Preview")
-                                preview_map = geemap.Map()
-                                preview_map.add_basemap("SATELLITE")
-                                preview_map.addLayer(Neg_points_id, {'color': 'red'}, 'Non-Dam Locations')
-                                preview_map.addLayer(Positive_dam_id, {'color': 'blue'}, 'Dam Locations')
-=======
                                 st.success("✅ Non-dam locations uploaded successfully!")
                                 
                                 # Display data preview
@@ -544,16 +513,11 @@ if st.session_state.questionnaire_shown:
                                 preview_map.add_basemap("SATELLITE")
                                 preview_map.addLayer(Neg_points_id, {'color': 'red'}, 'Non-dam locations')
                                 preview_map.addLayer(Positive_dam_id, {'color': 'blue'}, 'Dam locations')
->>>>>>> dev/chris
                                 preview_map.centerObject(Merged_collection)
                                 preview_map.to_streamlit(width=800, height=600)
                         except Exception as e:
                             st.error(f"Error processing file: {str(e)}")
-<<<<<<< HEAD
-                            st.error(traceback.format_exc()) 
-=======
                             st.error(traceback.format_exc())  # Show detailed error information
->>>>>>> dev/chris
 
             if generate_negatives_checkbox:
                 st.subheader("Specify the parameters for negative point generation:")
