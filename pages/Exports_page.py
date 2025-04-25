@@ -1077,5 +1077,5 @@ if st.session_state.questionnaire_shown:
                             )
                                           
                     st.success("Upstream & downstream analysis data loaded from session.")
-    st.info('You can make the Beaver Impacts Tool better by filling out our [survey](https://docs.google.com/forms/d/e/1FAIpQLSeE1GP7OptA4-z8Melz2AHxNsddtL9ZgJVXdVVtxLsrljJ10Q/viewform?usp=sharing).' )
+    st.info('You can make the Beaver Impacts Tool better by filling out our [feedback form](https://docs.google.com/forms/d/e/1FAIpQLSeE1GP7OptA4-z8Melz2AHxNsddtL9ZgJVXdVVtxLsrljJ10Q/viewform?usp=sharing).' )
 
