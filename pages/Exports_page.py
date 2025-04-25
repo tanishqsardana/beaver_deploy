@@ -157,8 +157,8 @@ if "fig" not in st.session_state:
 for i in range(1, 7):
     if f"step{i}_complete" not in st.session_state:
         st.session_state[f"step{i}_complete"] = False
-
-    
+        
+if not st.session_state.questionnaire_shown:    
     st.title("Beaver Impacts Feedback Survey")
     st.markdown("""
     Thank you for being a beta tester for the Beaver Impacts web tool! We really value your input and appreciate you taking the time to fill out this form.
