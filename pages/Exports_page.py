@@ -882,11 +882,6 @@ if st.session_state.questionnaire_shown:
                             
                         csv = export_df.to_csv(index=False).encode('utf-8')
                         st.download_button("Download Combined Data (CSV)", csv, "combined_data.csv", "text/csv")
-                        # Show questionnaire toast
-                        st.toast(
-                                "[Please help improve the Impacts tool by completing our survey!](https://docs.google.com/forms/d/e/1FAIpQLSeE1GP7OptA4-z8Melz2AHxNsddtL9ZgJVXdVVtxLsrljJ10Q/viewform?usp=sharing)",
-                                icon="📝"
-                                )
             with tab2:
                 if not "upstream_analysis_complete" in st.session_state:
                     st.session_state.upstream_analysis_complete = False
@@ -1082,3 +1077,4 @@ if st.session_state.questionnaire_shown:
                             )
                                           
                     st.success("Upstream & downstream analysis data loaded from session.")
+st.info('You can make the Beaver Impacts Tool better by filling out our [survey](https://docs.google.com/forms/d/e/1FAIpQLSeE1GP7OptA4-z8Melz2AHxNsddtL9ZgJVXdVVtxLsrljJ10Q/viewform?usp=sharing).' )
