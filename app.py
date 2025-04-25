@@ -6,7 +6,7 @@ st.sidebar.image("assets/pngimg.com - beaver_PNG35.png")
 
 about_page = st.Page(
     page = "pages/About_Lab.py",
-    title = "About Me",
+    title = "About the Tool",
     icon = ":material/account_circle:",
     default = True,
 )
