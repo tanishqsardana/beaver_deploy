@@ -174,7 +174,6 @@ if not st.session_state.questionnaire_shown:
 if st.session_state.questionnaire_shown:
     st.title("Analyzing the Impact of Beaver Dams")
     st.warning("Please note that the Evapotranspiration data is not available for the eastern half of the US or for certain years. Learn more on the OpenET website: [Link](https://explore.etdata.org/#5/39.665/-110.396).")
-    st.info('You can make the Beaver Impacts Tool better by filling out our [survey](https://docs.google.com/forms/d/e/1FAIpQLSeE1GP7OptA4-z8Melz2AHxNsddtL9ZgJVXdVVtxLsrljJ10Q/viewform?usp=sharing).' )
 
     # Create expandable sections for each step
     with st.expander("Step 1: Upload Dam Locations", expanded=not st.session_state.step1_complete):
@@ -1078,3 +1077,5 @@ if st.session_state.questionnaire_shown:
                             )
                                           
                     st.success("Upstream & downstream analysis data loaded from session.")
+    st.info('You can make the Beaver Impacts Tool better by filling out our [survey](https://docs.google.com/forms/d/e/1FAIpQLSeE1GP7OptA4-z8Melz2AHxNsddtL9ZgJVXdVVtxLsrljJ10Q/viewform?usp=sharing).' )
+
