@@ -158,12 +158,6 @@ for i in range(1, 7):
     if f"step{i}_complete" not in st.session_state:
         st.session_state[f"step{i}_complete"] = False
 
-# Show questionnaire toast if not shown before
-if not st.session_state.questionnaire_shown:
-    st.toast(
-        "Please help us improve by completing our survey!",
-        icon="📝"
-    )
     
     st.title("Beaver Impacts Feedback Survey")
     st.markdown("""
@@ -172,7 +166,7 @@ if not st.session_state.questionnaire_shown:
     Please click [here](https://docs.google.com/forms/d/e/1FAIpQLSeE1GP7OptA4-z8Melz2AHxNsddtL9ZgJVXdVVtxLsrljJ10Q/viewform?usp=sharing) to start the survey.
     """)
     
-    if st.button("I have opened the survey and will fill it out after trying the webtool.", type="primary"):
+    if st.button("I have opened the survey and will fill it out after trying the web tool.", type="primary"):
         st.session_state.questionnaire_shown = True
         st.rerun()
 
@@ -888,7 +882,11 @@ if st.session_state.questionnaire_shown:
                             
                         csv = export_df.to_csv(index=False).encode('utf-8')
                         st.download_button("Download Combined Data (CSV)", csv, "combined_data.csv", "text/csv")
-
+                        # Show questionnaire toast
+                        st.toast(
+                                "[Please help improve the Impacts tool by completing our survey!](https://docs.google.com/forms/d/e/1FAIpQLSeE1GP7OptA4-z8Melz2AHxNsddtL9ZgJVXdVVtxLsrljJ10Q/viewform?usp=sharing)",
+                                icon="📝"
+                                )
             with tab2:
                 if not "upstream_analysis_complete" in st.session_state:
                     st.session_state.upstream_analysis_complete = False
