@@ -179,7 +179,7 @@ if not st.session_state.questionnaire_shown:
 # Continue with the rest of the application if questionnaire is shown
 if st.session_state.questionnaire_shown:
     st.title("Analyzing the Impact of Beaver Dams")
-    st.warning("Please note that the Evapotranspiration data is not available for beaver dam locations in the east half of the US. See which states are not available on OpenET website: [Link](https://explore.etdata.org/#5/39.665/-110.396).")
+    st.warning("Please note that the Evapotranspiration data is not available for beaver dam locations in the eastern half of the US. See which states are not available on OpenET website: [Link](https://explore.etdata.org/#5/39.665/-110.396).")
     
     # Create expandable sections for each step
     with st.expander("Step 1: Upload Dam Locations", expanded=not st.session_state.step1_complete):
