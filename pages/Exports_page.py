@@ -163,7 +163,7 @@ if not st.session_state.questionnaire_shown:
     st.markdown("""
     Thank you for being a beta tester for the Beaver Impacts web tool! We really value your input and appreciate you taking the time to fill out this form.
     
-    Please click [here](https://docs.google.com/forms/d/e/1FAIpQLSeE1GP7OptA4-z8Melz2AHxNsddtL9ZgJVXdVVtxLsrljJ10Q/viewform?usp=sharing) to start the survey. Continue on by clicking the below: 
+    Please click [here](https://docs.google.com/forms/d/e/1FAIpQLSeE1GP7OptA4-z8Melz2AHxNsddtL9ZgJVXdVVtxLsrljJ10Q/viewform?usp=sharing) to start the survey. Continue on by clicking below: 
     """)
     
     if st.button("I have opened the survey and will fill it out after trying the web tool.", type="primary"):
