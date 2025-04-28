@@ -16,7 +16,7 @@ Briefly, this tool allows users to:
 4. Make plots of vegetation and water indices, temperature, and evapotranspiration over the course of a year, comparing dam to no-dam locations.
 5. Download plots and/or raw data.
 
-The rest of this page is documentation to help you understand what the tool does. If you have any questions, please contact [Grace Lindsay](mailto:gracewlindsay@gmail.com).
+To get started, click 'Analyze Impacts!' on the left. The rest of this page is documentation to help you understand what the tool does. If you have any questions, please contact [Grace Lindsay](mailto:gracewlindsay@gmail.com).
 
 ## Detailed Documentation
 We use the Google Earth Engine Python API under the hood to acess various data sources and perform analyses. Users work through the app according to the following steps:
