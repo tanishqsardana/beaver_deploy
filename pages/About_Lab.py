@@ -16,7 +16,7 @@ Briefly, this tool allows users to:
 4. Make plots of vegetation and water indices, temperature, and evapotranspiration over the course of a year, comparing dam to no-dam locations.
 5. Download plots and/or raw data.
 
-To get started, click 'Analyze Impacts!' on the left. The rest of this page is documentation to help you understand what the tool does. If you have any questions, please contact [Grace Lindsay](mailto:gracewlindsay@gmail.com).
+**To get started, click 'Analyze Impacts!' on the left.** The rest of this page is documentation to help you understand what the tool does. If you have any questions, please contact [Grace Lindsay](mailto:gracewlindsay@gmail.com).
 
 ## Detailed Documentation
 We use the Google Earth Engine Python API under the hood to acess various data sources and perform analyses. Users work through the app according to the following steps:
@@ -40,19 +40,19 @@ We use the Google Earth Engine Python API under the hood to acess various data s
 
 ![Buffer regions plotted on map](https://raw.githubusercontent.com/Chris-ZiyuK/beaver-app-st/refs/heads/main/assets/Step5.png)
 
-6. **Visualize Trends and Download Data**. In the final step, plots of core variables for dam and non-dam locations are presented as monthly means (with 95% confidence intervals) for the chosen year. For each month, we choose the least cloudy Sentinel-2 image for each location. From this multi-spectral Sentinel-2 imagery, we calculate a vegetation index (NDVI), and water index (green NDWI). We also report Land Surface Temperature (using Landsat 8), and evapotranspiration (as provided by [OpenET](https://etdata.org/)).Users can download these figures, as well as a CSV of the monthly values for each dam and no-dam site. Note: depending on the number of dams, this analysis step may take several minutes. Users also have the option of performing this analysis separately for portions of the waterway that are upstream and downsteam of each dam, though this will take longer to perform. Note: this analysis is currently based on only a rough estimate of which portions of the buffer region are up- vs. downstream; we are working to refine this approach.
+6. **Visualize Trends and Download Data**. In the final step, plots of core variables for dam and non-dam locations are presented as monthly means (with 95% confidence intervals) for the chosen year. For each month, we choose the least cloudy Sentinel-2 image for each location. From this multi-spectral Sentinel-2 imagery, we calculate a vegetation index (NDVI), and water index (green NDWI). We also report Land Surface Temperature (using Landsat 8), and evapotranspiration (as provided by [OpenET](https://etdata.org/)).Users can download these figures, as well as a CSV of the monthly values for each dam and no-dam site. Depending on the number of dams, this analysis step may take several minutes. Users also have the option of performing this analysis separately for portions of the waterway that are upstream and downsteam of each dam, though this will take longer to perform (note: this analysis is currently based on only a rough estimate of which portions of the buffer region are up- vs. downstream; we are working to refine this approach).
 
 ![Running plot generation](https://raw.githubusercontent.com/Chris-ZiyuK/beaver-app-st/refs/heads/main/assets/Step6.png)
 
-Users can expect to see plots similar to these:
+**Users can expect to see plots similar to these:**
 ![Output plots](https://raw.githubusercontent.com/Chris-ZiyuK/beaver-app-st/refs/heads/main/assets/combined_trends_demo.png)
 
-Exported CSV contain monthly values for each location:
+**Exported CSV contain monthly values for each location:**
 ![Example CSV output](https://raw.githubusercontent.com/Chris-ZiyuK/beaver-app-st/refs/heads/main/assets/outputcsv.png)
 
 
 
-If you want to re-run your analysis with changed dam locations or variables, please refresh the Analyze Impacts page.
+### If you want to re-run your analysis with changed dam locations or variables, please refresh the Analyze Impacts page.
 ''')
 
 #st.balloons()
