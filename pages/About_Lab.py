@@ -7,7 +7,7 @@ st.markdown('''
 
 The Beaver Impacts Tool is a web app developed by the Beaver Lab at [Collaborative Earth](https://www.collaborative.earth/) to help land managers and researchers understand the impact of beavers and beaver-based restoration on their land.
 
-If you're reading this, **you have agreed to beta-test this tool.** Thanks! This means that after you play around with the tool, *you commit to filling out this feedback form:* [Beaver Impacts Feedback](dubaz-eiveg-iapan-aeksa)
+If you're reading this, **you have agreed to beta-test this tool.** Thanks! This means that after you play around with the tool, *you commit to filling out this feedback form:* [Beaver Impacts Feedback](https://docs.google.com/forms/d/e/1FAIpQLSeE1GP7OptA4-z8Melz2AHxNsddtL9ZgJVXdVVtxLsrljJ10Q/viewform)
 
 Briefly, this tool allows users to:
 1. Upload locations of observed dams or installed beaver dam analogs.
