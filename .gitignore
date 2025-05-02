@@ -2,3 +2,9 @@ smenv/
 .DS_Store
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pywz
+*.pyzw

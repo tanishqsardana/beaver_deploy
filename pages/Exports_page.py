@@ -790,8 +790,6 @@ if st.session_state.questionnaire_shown:
                                     df_lst = geemap.ee_to_df(results_fcc_lst)
                                 except Exception as e:
                                     st.error(f"Error converting to DataFrame: {e}")
-                                    st.error("This might be due to missing or invalid dates in your data.")
-                                    st.error("Please check that all your data points have valid dates.")
                                     st.stop()
 
                                 df_lst['Image_month'] = pd.to_numeric(df_lst['Image_month'])
