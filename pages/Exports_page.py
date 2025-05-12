@@ -787,7 +787,35 @@ if st.session_state.questionnaire_shown:
                                 results_fcc_lst = ee.FeatureCollection(results_fc_lst)
 
                                 try:
-                                    df_lst = geemap.ee_to_df(results_fcc_lst)
+
+                                    total_count = results_fcc_lst.size().getInfo()
+                                    batch_size = 10
+                                    num_batches = (total_count + batch_size - 1) // batch_size
+                                    df_list = []
+                                    
+                                    progress_bar = st.progress(0)
+                                    for i in range(num_batches):
+                                        st.write(f"Processing batch {i+1} of {num_batches}")
+                                        batch = results_fcc_lst.toList(batch_size, i * batch_size)
+                                        dam_batch = ee.FeatureCollection(batch)
+                                        
+                                        # A) 
+                                        S2_ImageCollection_batch = ee.ImageCollection(S2_Export_for_visual(dam_batch))
+                                        
+                                        # B) 
+                                        S2_with_LST_ET_batch = S2_ImageCollection_batch.map(add_landsat_lst_et)
+                                        
+                                        # C) 
+                                        results_fc_ET_batch = S2_with_LST_ET_batch.map(compute_all_metrics_LST_ET)
+                                        
+                                        # D) 
+                                        results_fcc_ET_batch = ee.FeatureCollection(results_fc_ET_batch)
+                                        df_batch = geemap.ee_to_df(results_fcc_ET_batch)
+                                        df_list.append(df_batch)
+                                        
+                                        progress_bar.progress((i + 1) / num_batches)
+                                    
+                                    df_lst = pd.concat(df_list, ignore_index=True)
                                 except Exception as e:
                                     st.error(f"Error converting to DataFrame: {e}")
                                     st.stop()
