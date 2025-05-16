@@ -870,13 +870,16 @@ def add_landsat_lst(s2_image):
 
 def add_landsat_lst_et(s2_image):
     """Adds robust Landsat LST and OpenET ET bands to a Sentinel-2 image."""
-
+    
+    # st.write("DEBUG: Starting add_landsat_lst_et function")
+    
     year = ee.Number(s2_image.get('Image_year'))
     month = ee.Number(s2_image.get('Image_month'))
     start_date = ee.Date.fromYMD(year, month, 1)
     end_date = start_date.advance(1, 'month')
 
     boxArea = s2_image.geometry()
+    # st.write(f"DEBUG: Processing area for year")
 
     ## STEP 1: PROCESS LANDSAT FOR LST
     def apply_scale_factors(image):
@@ -890,11 +893,14 @@ def add_landsat_lst_et(s2_image):
                qa.bitwiseAnd(1 << 5).eq(0))
         return image.updateMask(mask)
 
+    # st.write("DEBUG: Fetching Landsat collection")
     landsat_col = (ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
                    .filterDate(start_date, end_date)
                    .filterBounds(boxArea)
                    .map(apply_scale_factors)
                    .map(cloud_mask))
+    
+    # st.write(f"DEBUG: Landsat collection size")
 
     def add_ndvi_stats(img):
         ndvi = img.normalizedDifference(['SR_B5', 'SR_B4']).rename('NDVI')
@@ -906,14 +912,18 @@ def add_landsat_lst_et(s2_image):
         )
         return img.setMulti(ndvi_dict)
 
+    # st.write("DEBUG: Adding NDVI stats")
     landsat_col = landsat_col.map(add_ndvi_stats)
     filtered_col = landsat_col.filter(ee.Filter.neq('NDVI_min', None))
     collection_size = filtered_col.size()
+    # st.write(f"DEBUG: Filtered collection size")
 
     # Robust LST calculation handling special cases
     def robust_compute_lst(filtered_col, boxArea):
         def lst_from_image(img):
+            # st.write("DEBUG: Computing LST from single image")
             ndvi = img.normalizedDifference(['SR_B5', 'SR_B4']).rename('NDVI')
+            # st.write("DEBUG: Computing NDVI stats")
             ndvi_dict = ndvi.reduceRegion(
                 reducer=ee.Reducer.minMax(), 
                 geometry=boxArea, 
@@ -931,6 +941,7 @@ def add_landsat_lst_et(s2_image):
             # Check explicitly for identical min/max or zero-range NDVI
             zero_range = ndvi_max.subtract(ndvi_min).abs().lt(1e-6)
 
+            # st.write("DEBUG: Computing FV")
             fv = ee.Image(
                 ee.Algorithms.If(
                     zero_range,
@@ -939,9 +950,11 @@ def add_landsat_lst_et(s2_image):
                 )
             )
 
+            # st.write("DEBUG: Computing EM")
             em = fv.multiply(0.004).add(0.986).rename('EM')
             thermal = img.select('ST_B10').rename('thermal')
 
+            # st.write("DEBUG: Computing final LST")
             lst = thermal.expression(
                 '(TB / (1 + (0.00115 * (TB / 1.438)) * log(em))) - 273.15',
                 {'TB': thermal, 'em': em}
@@ -949,6 +962,7 @@ def add_landsat_lst_et(s2_image):
 
             return lst
 
+        # st.write("DEBUG: Starting robust LST computation")
         lst_image = ee.Algorithms.If(
             filtered_col.size().eq(0),
             ee.Image.constant(99).rename('LST').clip(boxArea),
@@ -960,15 +974,18 @@ def add_landsat_lst_et(s2_image):
         )
         return ee.Image(lst_image)
 
+    # st.write("DEBUG: Computing LST image")
     lst_image = robust_compute_lst(filtered_col, boxArea)
 
     ## STEP 2: PROCESS OPENET ET DATA
+    # st.write("DEBUG: Processing OpenET data")
     et_collection = (
         ee.ImageCollection("OpenET/ENSEMBLE/CONUS/GRIDMET/MONTHLY/v2_0")
         .filterDate(start_date, end_date)
         .filterBounds(boxArea)
     )
 
+    # st.write(f"DEBUG: OpenET collection size")
     et_monthly = et_collection.mean().select("et_ensemble_mad").rename("ET")
 
     et_final = ee.Algorithms.If(
@@ -980,6 +997,7 @@ def add_landsat_lst_et(s2_image):
     et_final = ee.Image(et_final)
 
     ## STEP 3: ADD BANDS BACK TO SENTINEL-2 IMAGE
+    # st.write("DEBUG: Adding bands back to Sentinel-2 image")
     return s2_image.addBands(lst_image).addBands(et_final).set("landsat_collection_size", collection_size)
 
 ########### Functions to calculate means

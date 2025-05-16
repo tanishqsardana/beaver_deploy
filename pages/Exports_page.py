@@ -779,45 +779,46 @@ if st.session_state.questionnaire_shown:
                                     st.error("No valid data with dates found. Please check your data.")
                                     st.stop()
 
-                                S2_cloud_mask_export = ee.ImageCollection(S2_Export_for_visual(Dam_data))
-                                S2_ImageCollection = ee.ImageCollection(S2_cloud_mask_export)
-
-                                S2_with_LST = S2_ImageCollection.map(add_landsat_lst_et)
-                                results_fc_lst = S2_with_LST.map(compute_all_metrics_LST_ET)
-                                results_fcc_lst = ee.FeatureCollection(results_fc_lst)
-
-                                try:
-
-                                    total_count = results_fcc_lst.size().getInfo()
-                                    batch_size = 10
-                                    num_batches = (total_count + batch_size - 1) // batch_size
-                                    df_list = []
-                                    
-                                    progress_bar = st.progress(0)
-                                    for i in range(num_batches):
+                                # Get total number of dam points
+                                total_count = Dam_data.size().getInfo()
+                                batch_size = 30  # Increased batch size for efficiency
+                                num_batches = (total_count + batch_size - 1) // batch_size
+                                df_list = []
+                                
+                                progress_bar = st.progress(0)
+                                st.write(f"Processing {total_count} dam points in {num_batches} batches")
+                                
+                                # Process each batch separately
+                                for i in range(num_batches):
+                                    try:
                                         st.write(f"Processing batch {i+1} of {num_batches}")
-                                        batch = results_fcc_lst.toList(batch_size, i * batch_size)
-                                        dam_batch = ee.FeatureCollection(batch)
                                         
-                                        # A) 
-                                        S2_ImageCollection_batch = ee.ImageCollection(S2_Export_for_visual(dam_batch))
+                                        # Get current batch of dam points
+                                        dam_batch = Dam_data.toList(batch_size, i * batch_size)
+                                        dam_batch_fc = ee.FeatureCollection(dam_batch)
                                         
-                                        # B) 
-                                        S2_with_LST_ET_batch = S2_ImageCollection_batch.map(add_landsat_lst_et)
+                                        # Process this batch through the entire pipeline
+                                        S2_cloud_mask_batch = ee.ImageCollection(S2_Export_for_visual(dam_batch_fc))
+                                        S2_ImageCollection_batch = ee.ImageCollection(S2_cloud_mask_batch)
+                                        S2_with_LST_batch = S2_ImageCollection_batch.map(add_landsat_lst_et)
+                                        results_fc_lst_batch = S2_with_LST_batch.map(compute_all_metrics_LST_ET)
+                                        results_fcc_lst_batch = ee.FeatureCollection(results_fc_lst_batch)
                                         
-                                        # C) 
-                                        results_fc_ET_batch = S2_with_LST_ET_batch.map(compute_all_metrics_LST_ET)
-                                        
-                                        # D) 
-                                        results_fcc_ET_batch = ee.FeatureCollection(results_fc_ET_batch)
-                                        df_batch = geemap.ee_to_df(results_fcc_ET_batch)
+                                        # Convert directly to DataFrame
+                                        df_batch = geemap.ee_to_df(results_fcc_lst_batch)
                                         df_list.append(df_batch)
                                         
                                         progress_bar.progress((i + 1) / num_batches)
-                                    
+                                    except Exception as e:
+                                        st.warning(f"Error processing batch {i+1}: {e}")
+                                        # Continue with the next batch instead of stopping
+                                        continue
+                                
+                                # Combine all batch results
+                                if len(df_list) > 0:
                                     df_lst = pd.concat(df_list, ignore_index=True)
-                                except Exception as e:
-                                    st.error(f"Error converting to DataFrame: {e}")
+                                else:
+                                    st.error(f"Error Message: {e}")
                                     st.stop()
 
                                 df_lst['Image_month'] = pd.to_numeric(df_lst['Image_month'])
@@ -924,31 +925,42 @@ if st.session_state.questionnaire_shown:
                                     
                                     # Batch processing
                                     total_count = Dam_data.size().getInfo()
-                                    batch_size = 10
+                                    batch_size = 30  # Increased batch size for efficiency
                                     num_batches = (total_count + batch_size - 1) // batch_size
-                                    dam_list = Dam_data.toList(total_count)
                                     df_list = []
 
                                     progress_bar = st.progress(0)
+                                    st.write(f"Processing {total_count} dam points in {num_batches} batches")
+                                    
                                     for i in range(num_batches):
-                                        batch = dam_list.slice(i * batch_size, min(total_count, (i + 1) * batch_size))
-                                        dam_batch = ee.FeatureCollection(batch)
+                                        try:
+                                            st.write(f"Processing batch {i+1} of {num_batches}")
+                                            
+                                            # Get current batch of dam points
+                                            dam_batch = Dam_data.toList(batch_size, i * batch_size)
+                                            dam_batch_fc = ee.FeatureCollection(dam_batch)
 
-                                        # Process the images with flow direction
-                                        S2_IC_batch = S2_Export_for_visual_flowdir(dam_batch, waterway_fc)
-                                        
-                                        # Add LST and ET data
-                                        S2_with_LST_ET = S2_IC_batch.map(add_landsat_lst_et)
-                                        
-                                        # Compute metrics for upstream and downstream
-                                        results_batch = S2_with_LST_ET.map(compute_all_metrics_up_downstream)
-                                        
-                                        # Convert to DataFrame
-                                        df_batch = geemap.ee_to_df(ee.FeatureCollection(results_batch))
-                                        df_list.append(df_batch)
-                                        progress_bar.progress((i+1)/num_batches)
+                                            # Process this batch through the entire pipeline
+                                            S2_IC_batch = S2_Export_for_visual_flowdir(dam_batch_fc, waterway_fc)
+                                            S2_with_LST_ET = S2_IC_batch.map(add_landsat_lst_et)
+                                            results_batch = S2_with_LST_ET.map(compute_all_metrics_up_downstream)
+                                            
+                                            # Convert directly to DataFrame
+                                            df_batch = geemap.ee_to_df(ee.FeatureCollection(results_batch))
+                                            df_list.append(df_batch)
+                                            progress_bar.progress((i+1)/num_batches)
+                                        except Exception as e:
+                                            st.warning(f"Error processing batch {i+1}: {e}")
+                                            # Continue with the next batch instead of stopping
+                                            continue
 
-                                    final_df = pd.concat(df_list)
+                                    # Combine all batch results
+                                    if len(df_list) > 0:
+                                        final_df = pd.concat(df_list, ignore_index=True)
+                                    else:
+                                        st.error("All batches failed processing. Please check your data.")
+                                        st.stop()
+
                                     final_df['Dam_status'] = final_df['Dam_status'].replace({'positive': 'Dam', 'negative': 'Non-dam'})
                                     st.session_state.final_df = final_df
 
