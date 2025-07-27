@@ -111,7 +111,8 @@ credentials = service_account.Credentials.from_service_account_info(
     scopes=["https://www.googleapis.com/auth/earthengine"]
 )
 
-ee.Initialize(credentials, project="ee-beaver-lab")
+# ee.Initialize(credentials, project="ee-beaver-lab")
+ee.Initialize(credentials, project="global-pagoda-324716")
 
 # Initialize session state for questionnaire
 if 'questionnaire_shown' not in st.session_state:
@@ -188,14 +189,19 @@ if st.session_state.questionnaire_shown:
                         st.session_state.Full_positive = feature_collection
                         st.session_state.step1_complete = True
                         
+
                         # Display data preview
                         st.subheader("Data Preview")
                         st.text("Points may take a few seconds to upload")
+
                         preview_map = geemap.Map()
                         preview_map.add_basemap("SATELLITE")
                         preview_map.addLayer(feature_collection, {'color': 'blue'}, 'Dam Locations')
+                        
                         preview_map.centerObject(feature_collection)
                         preview_map.to_streamlit(width=800, height=600)
+
+
                 except Exception as e:
                     st.error(f"Error processing file: {str(e)}")
 
