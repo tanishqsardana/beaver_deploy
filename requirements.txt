@@ -93,7 +93,7 @@ rich==13.9.4
 rpds-py==0.23.1
 rsa==4.9
 scikit-learn==1.6.1
-scipy
+scipy==1.13.1
 scooby==0.10.0
 seaborn==0.13.2
 six==1.17.0
@@ -115,4 +115,3 @@ wcwidth==0.2.13
 widgetsnbextension==4.0.13
 xyzservices==2025.1.0
 zipp==3.21.0
-setuptools
